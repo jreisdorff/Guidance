@@ -392,9 +392,46 @@ function Backdrop({ children }) {
   )
 }
 
+// Country dial codes for the phone sign-in dropdown. `dial` has no leading "+";
+// `max` caps the national number length (used for masking and validation).
+const COUNTRIES = [
+  { iso: 'US', name: 'United States', dial: '1', flag: '🇺🇸', max: 10 },
+  { iso: 'CA', name: 'Canada', dial: '1', flag: '🇨🇦', max: 10 },
+  { iso: 'GB', name: 'United Kingdom', dial: '44', flag: '🇬🇧', max: 10 },
+  { iso: 'AU', name: 'Australia', dial: '61', flag: '🇦🇺', max: 9 },
+  { iso: 'IN', name: 'India', dial: '91', flag: '🇮🇳', max: 10 },
+  { iso: 'IE', name: 'Ireland', dial: '353', flag: '🇮🇪', max: 9 },
+  { iso: 'DE', name: 'Germany', dial: '49', flag: '🇩🇪', max: 11 },
+  { iso: 'FR', name: 'France', dial: '33', flag: '🇫🇷', max: 9 },
+  { iso: 'ES', name: 'Spain', dial: '34', flag: '🇪🇸', max: 9 },
+  { iso: 'IT', name: 'Italy', dial: '39', flag: '🇮🇹', max: 10 },
+  { iso: 'NL', name: 'Netherlands', dial: '31', flag: '🇳🇱', max: 9 },
+  { iso: 'MX', name: 'Mexico', dial: '52', flag: '🇲🇽', max: 10 },
+  { iso: 'BR', name: 'Brazil', dial: '55', flag: '🇧🇷', max: 11 },
+  { iso: 'JP', name: 'Japan', dial: '81', flag: '🇯🇵', max: 10 },
+  { iso: 'KR', name: 'South Korea', dial: '82', flag: '🇰🇷', max: 10 },
+  { iso: 'NZ', name: 'New Zealand', dial: '64', flag: '🇳🇿', max: 9 },
+  { iso: 'SG', name: 'Singapore', dial: '65', flag: '🇸🇬', max: 8 },
+  { iso: 'AE', name: 'United Arab Emirates', dial: '971', flag: '🇦🇪', max: 9 },
+]
+
+// Progressive display mask. NANP (+1) numbers get "(XXX) XXX-XXXX"; everything
+// else is grouped into threes. Input is digits only.
+function formatPhone(digits, dial) {
+  const d = digits.replace(/\D/g, '')
+  if (dial === '1') {
+    if (d.length > 6) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6, 10)}`
+    if (d.length > 3) return `(${d.slice(0, 3)}) ${d.slice(3)}`
+    if (d.length > 0) return `(${d}`
+    return ''
+  }
+  return d.replace(/(.{3})(?=.)/g, '$1 ').trim()
+}
+
 function SignIn() {
   const [step, setStep] = useState('choose') // choose | phone | code
-  const [phone, setPhone] = useState('')
+  const [countryIso, setCountryIso] = useState('US')
+  const [phoneDigits, setPhoneDigits] = useState('')
   const [code, setCode] = useState('')
   const [confirmation, setConfirmation] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -421,21 +458,22 @@ function SignIn() {
     return window._guidanceRecaptcha
   }
 
+  const country = COUNTRIES.find((c) => c.iso === countryIso) ?? COUNTRIES[0]
+
   async function sendCode(e) {
     e.preventDefault()
-    if (!phone.trim() || busy) return
+    if (!phoneDigits || busy) return
     setBusy(true)
     setError('')
     try {
-      const conf = await signInWithPhoneNumber(auth, phone.trim(), getVerifier())
+      // Country code is prepended automatically → full E.164, e.g. +15550001234.
+      const e164 = `+${country.dial}${phoneDigits}`
+      const conf = await signInWithPhoneNumber(auth, e164, getVerifier())
       setConfirmation(conf)
       setStep('code')
     } catch (err) {
       console.error('phone sign-in:', err)
-      setError(
-        `Could not send a code (${err?.code || err?.message || 'unknown'}). ` +
-          'Use the country code, e.g. +1 555 000 0000.',
-      )
+      setError(`Could not send a code (${err?.code || err?.message || 'unknown'}).`)
     } finally {
       setBusy(false)
     }
@@ -493,17 +531,35 @@ function SignIn() {
 
           {step === 'phone' && (
             <form onSubmit={sendCode} className="flex flex-col gap-3">
+              <select
+                value={countryIso}
+                onChange={(e) => {
+                  setCountryIso(e.target.value)
+                  setError('')
+                }}
+                className="w-full rounded-2xl bg-white/70 px-4 py-3 text-stone-700 ring-1 ring-white/60 focus:outline-none"
+              >
+                {COUNTRIES.map((c) => (
+                  <option key={c.iso} value={c.iso}>
+                    {c.flag} {c.name} (+{c.dial})
+                  </option>
+                ))}
+              </select>
               <input
                 type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                value={formatPhone(phoneDigits, country.dial)}
+                onChange={(e) =>
+                  setPhoneDigits(
+                    e.target.value.replace(/\D/g, '').slice(0, country.max ?? 15),
+                  )
+                }
                 autoFocus
-                placeholder="+1 555 000 0000"
+                placeholder={country.dial === '1' ? '(555) 000-0000' : 'Phone number'}
                 className="w-full rounded-2xl bg-white/70 px-4 py-3 text-center text-lg tracking-wide text-stone-700 placeholder:text-stone-400 ring-1 ring-white/60 focus:outline-none"
               />
               <button
                 type="submit"
-                disabled={!phone.trim() || busy}
+                disabled={!phoneDigits || busy}
                 className="rounded-full bg-gradient-to-r from-amber-500 to-rose-500 px-6 py-3 font-600 text-white shadow-lg shadow-rose-500/20 transition hover:brightness-105 active:scale-[0.98] disabled:opacity-40"
               >
                 {busy ? 'Sending…' : 'Send code'}

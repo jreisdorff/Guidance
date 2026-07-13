@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   KeyboardAvoidingView,
   Platform,
@@ -13,21 +13,47 @@ import SunMark from '../components/SunMark'
 import GradientButton from '../components/GradientButton'
 import { useAuth } from '../auth/AuthContext'
 import { getGuidance, type Guidance, ApiError } from '../api/client'
+import { addEntry, subscribeEntries, type JournalItem } from '../journal'
 import { colors, fonts, PROMPTS } from '../theme'
 
-type JournalItem = Guidance & { entry: string; ts: number }
+type ResultItem = Guidance & { entry: string; ts: number }
 
-function formatDate(ts: number) {
-  return new Date(ts).toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
+// Just the time within a day's group, e.g. "3:45 PM".
+function formatTime(ts: number) {
+  return new Date(ts).toLocaleTimeString(undefined, {
     hour: 'numeric',
     minute: '2-digit',
   })
 }
 
+// A friendly header for a day: "Today", "Yesterday", else "Monday, July 13".
+function dateLabel(ts: number) {
+  const startOfDay = (d: Date) =>
+    new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const diffDays = Math.round((startOfDay(new Date()) - startOfDay(new Date(ts))) / 86400000)
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  return new Date(ts).toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
+// Groups entries (already newest-first) into consecutive day buckets.
+function groupByDate(entries: JournalItem[]) {
+  const groups: { label: string; items: JournalItem[] }[] = []
+  for (const e of entries) {
+    const label = dateLabel(e.ts)
+    const last = groups[groups.length - 1]
+    if (last && last.label === label) last.items.push(e)
+    else groups.push({ label, items: [e] })
+  }
+  return groups
+}
+
 export default function HomeScreen() {
-  const { getToken, signOut } = useAuth()
+  const { user, getToken, signOut } = useAuth()
   const scrollRef = useRef<ScrollView>(null)
   const [prompt] = useState(
     () => PROMPTS[Math.floor((Date.now() / 1000) % PROMPTS.length)],
@@ -35,10 +61,16 @@ export default function HomeScreen() {
   const [entry, setEntry] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<JournalItem | null>(null)
+  const [result, setResult] = useState<ResultItem | null>(null)
   const [journal, setJournal] = useState<JournalItem[]>([])
   const [showJournal, setShowJournal] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  // Live-subscribe to this user's journal in Firestore.
+  useEffect(() => {
+    if (!user) return
+    return subscribeEntries(user.uid, setJournal)
+  }, [user])
 
   async function onSubmit() {
     if (!entry.trim() || loading) return
@@ -51,7 +83,10 @@ export default function HomeScreen() {
         return
       }
       const guidance = await getGuidance(token, entry.trim(), result?.affirmation)
-      setResult({ ...guidance, entry: entry.trim(), ts: Date.now() })
+      const record = { ...guidance, entry: entry.trim(), ts: Date.now() }
+      setResult(record)
+      // Persist to Firestore; the subscription refreshes the journal list.
+      if (user) addEntry(user.uid, record).catch(() => {})
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         await signOut()
@@ -75,12 +110,34 @@ export default function HomeScreen() {
     }
   }
 
-  // Move the current response into the journal, clear the input, scroll up.
-  function onNext() {
-    if (!result) return
-    setJournal((prev) => [result, ...prev].slice(0, 100))
-    setResult(null)
+  // Regenerate a fresh affirmation for the same entry, phrased differently.
+  async function onAnother() {
+    if (!result || loading) return
+    setLoading(true)
+    setError(null)
+    try {
+      const token = await getToken()
+      if (!token) {
+        await signOut()
+        return
+      }
+      const guidance = await getGuidance(token, result.entry, result.affirmation)
+      setResult((prev) => (prev ? { ...prev, ...guidance } : prev))
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        await signOut()
+        return
+      }
+      setError('Could not reach Guidance right now. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Clear the input and current response, and scroll back to the top.
+  function onReset() {
     setEntry('')
+    setResult(null)
     setError(null)
     scrollRef.current?.scrollTo({ y: 0, animated: true })
   }
@@ -154,12 +211,21 @@ export default function HomeScreen() {
               <Text style={styles.reflect}>{result.reflect}</Text>
               <Text style={styles.affirmation}>{result.affirmation}</Text>
 
-              <Pressable
-                style={({ pressed }) => [styles.nextBtn, pressed && styles.pressed]}
-                onPress={onNext}
-              >
-                <Text style={styles.nextBtnText}>Next</Text>
-              </Pressable>
+              <View style={styles.actionsRow}>
+                <Pressable
+                  style={({ pressed }) => [styles.anotherBtn, pressed && styles.pressed]}
+                  onPress={onAnother}
+                  disabled={loading}
+                >
+                  <Text style={styles.anotherBtnText}>Say it another way</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.freshBtn, pressed && styles.pressed]}
+                  onPress={onReset}
+                >
+                  <Text style={styles.freshBtnText}>Start fresh</Text>
+                </Pressable>
+              </View>
             </View>
             <Text style={styles.breathe}>
               Read it slowly. Take one full breath before you move on.
@@ -188,16 +254,21 @@ export default function HomeScreen() {
               {journal.length === 0 ? (
                 <View style={styles.emptyCard}>
                   <Text style={styles.emptyText}>
-                    Nothing here yet. What you share will be saved for you to
-                    return to.
+                    Nothing here yet. What you share will be saved to your
+                    account, for you to return to.
                   </Text>
                 </View>
               ) : (
-                journal.map((r, i) => (
-                  <View key={i} style={styles.journalCard}>
-                    <Text style={styles.journalTime}>{formatDate(r.ts)}</Text>
-                    <Text style={styles.journalEntry}>“{r.entry}”</Text>
-                    <Text style={styles.journalAffirmation}>{r.affirmation}</Text>
+                groupByDate(journal).map((group) => (
+                  <View key={group.label} style={styles.journalGroup}>
+                    <Text style={styles.journalDate}>{group.label}</Text>
+                    {group.items.map((r) => (
+                      <View key={r.id} style={styles.journalCard}>
+                        <Text style={styles.journalTime}>{formatTime(r.ts)}</Text>
+                        <Text style={styles.journalEntry}>“{r.entry}”</Text>
+                        <Text style={styles.journalAffirmation}>{r.affirmation}</Text>
+                      </View>
+                    ))}
                   </View>
                 ))
               )}
@@ -208,6 +279,9 @@ export default function HomeScreen() {
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>Written for you 🌅</Text>
+          <Pressable onPress={signOut} hitSlop={8}>
+            <Text style={styles.signOut}>Sign out</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -314,15 +388,22 @@ const styles = StyleSheet.create({
     lineHeight: 36,
     marginTop: 18,
   },
-  nextBtn: {
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
     marginTop: 26,
-    alignSelf: 'flex-start',
+  },
+  anotherBtn: {
     backgroundColor: colors.stone800,
     borderRadius: 999,
     paddingVertical: 11,
     paddingHorizontal: 22,
   },
-  nextBtnText: { fontFamily: fonts.sansSemibold, color: colors.amber50, fontSize: 15 },
+  anotherBtnText: { fontFamily: fonts.sansSemibold, color: colors.amber50, fontSize: 15 },
+  freshBtn: { borderRadius: 999, paddingVertical: 11, paddingHorizontal: 16 },
+  freshBtnText: { fontFamily: fonts.sansSemibold, color: colors.stone500, fontSize: 15 },
   pressed: { opacity: 0.85 },
   breathe: {
     fontFamily: fonts.sans,
@@ -344,7 +425,16 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontFamily: fonts.sans, color: colors.stone400, fontSize: 12 },
 
-  journalList: { marginTop: 14, gap: 12 },
+  journalList: { marginTop: 14, gap: 20 },
+  journalGroup: { gap: 12 },
+  journalDate: {
+    fontFamily: fonts.sansSemibold,
+    color: colors.stone400,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    paddingHorizontal: 2,
+  },
   emptyCard: {
     backgroundColor: colors.cardSoft,
     borderRadius: 20,

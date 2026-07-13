@@ -10,32 +10,11 @@ import {
   signInWithPopup,
   signOut,
 } from 'firebase/auth'
+import { addEntry, subscribeEntries, removeEntry } from './journal.js'
 
-// A stable, per-device identifier. Generated once on this device and kept in
-// localStorage, so the journal below is scoped to this device rather than to a
-// single global key shared by anyone who opens the app.
-const DEVICE_KEY = 'divinity.device.v1'
-
-function getDeviceId() {
-  try {
-    let id = localStorage.getItem(DEVICE_KEY)
-    if (!id) {
-      id =
-        typeof crypto !== 'undefined' && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-      localStorage.setItem(DEVICE_KEY, id)
-    }
-    return id
-  } catch {
-    // Storage unavailable — fall back to a session-only id.
-    return 'ephemeral'
-  }
-}
-
-const DEVICE_ID = getDeviceId()
-const STORAGE_KEY = `divinity.journal.v1.${DEVICE_ID}`
-const MODE_KEY = `divinity.mode.v1.${DEVICE_ID}`
+// The journal now lives per-user in Firestore (src/journal.js). Mode preference
+// stays in localStorage — it's just a device-level UI choice.
+const MODE_KEY = 'divinity.mode.v1'
 
 const PROMPTS = [
   'What is weighing on you right now?',
@@ -45,28 +24,45 @@ const PROMPTS = [
   'What do you wish you could believe about yourself?',
 ]
 
-function loadJournal() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
-}
-
-function formatDate(ts) {
-  return new Date(ts).toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
+// Just the time within a day's group, e.g. "3:45 PM".
+function formatTime(ts) {
+  return new Date(ts).toLocaleTimeString(undefined, {
     hour: 'numeric',
     minute: '2-digit',
   })
 }
 
+// A friendly header for a day: "Today", "Yesterday", else "Monday, July 13".
+function dateLabel(ts) {
+  const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const day = startOfDay(new Date(ts))
+  const today = startOfDay(new Date())
+  const diffDays = Math.round((today - day) / 86400000)
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  return new Date(ts).toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
+// Groups entries (already sorted newest-first) into consecutive day buckets.
+function groupByDate(entries) {
+  const groups = []
+  for (const e of entries) {
+    const label = dateLabel(e.ts)
+    const last = groups[groups.length - 1]
+    if (last && last.label === label) last.items.push(e)
+    else groups.push({ label, items: [e] })
+  }
+  return groups
+}
+
 export default function App() {
   const [entry, setEntry] = useState('')
   const [result, setResult] = useState(null)
-  const [journal, setJournal] = useState(loadJournal)
+  const [journal, setJournal] = useState([])
   const [showJournal, setShowJournal] = useState(false)
   const [prompt] = useState(() => PROMPTS[Math.floor((Date.now() / 1000) % PROMPTS.length)])
   const [mode, setMode] = useState(() => localStorage.getItem(MODE_KEY) || 'ai')
@@ -86,13 +82,14 @@ export default function App() {
     localStorage.setItem(MODE_KEY, mode)
   }, [mode])
 
+  // Live-subscribe to this user's journal in Firestore.
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(journal))
-    } catch {
-      /* storage may be unavailable; the app still works for the session */
+    if (!user) {
+      setJournal([])
+      return
     }
-  }, [journal])
+    return subscribeEntries(user.uid, setJournal)
+  }, [user])
 
   useEffect(() => {
     if (result && resultRef.current) {
@@ -138,9 +135,10 @@ export default function App() {
     setNotice(null)
     const generated = await produce(text, result?.affirmation)
     if (!generated) return setLoading(false) // signed out; gate will take over
-    const record = { id: `${Date.now()}`, ts: Date.now(), entry: text, ...generated }
+    const record = { ts: Date.now(), entry: text, ...generated }
     setResult(record)
-    setJournal((prev) => [record, ...prev].slice(0, 100))
+    // Persist to the user's Firestore journal; the subscription refreshes the list.
+    if (user) addEntry(user.uid, record).catch(() => {})
     setLoading(false)
   }
 
@@ -161,12 +159,13 @@ export default function App() {
   }
 
   function deleteEntry(id) {
-    setJournal((prev) => prev.filter((r) => r.id !== id))
+    if (user) removeEntry(user.uid, id).catch(() => {})
   }
 
   function clearJournal() {
+    if (!user) return
     if (window.confirm('Clear your whole journal? This cannot be undone.')) {
-      setJournal([])
+      journal.forEach((r) => removeEntry(user.uid, r.id).catch(() => {}))
     }
   }
 
@@ -334,35 +333,42 @@ export default function App() {
           </div>
 
           {showJournal && (
-            <div className="animate-rise mt-4 space-y-3">
+            <div className="animate-rise mt-4 space-y-6">
               {journal.length === 0 && (
                 <p className="rounded-2xl bg-white/50 px-5 py-6 text-center text-sm text-stone-400">
-                  Nothing here yet. What you share will be saved privately on this
-                  device, for you to return to.
+                  Nothing here yet. What you share will be saved to your account,
+                  for you to return to.
                 </p>
               )}
-              {journal.map((r) => (
-                <article
-                  key={r.id}
-                  className="group rounded-2xl bg-white/60 p-5 ring-1 ring-white/60 backdrop-blur"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <time className="text-xs uppercase tracking-wider text-stone-400">
-                      {formatDate(r.ts)}
-                    </time>
-                    <button
-                      onClick={() => deleteEntry(r.id)}
-                      className="text-xs text-stone-300 opacity-0 transition hover:text-rose-400 group-hover:opacity-100"
-                      aria-label="Delete entry"
+              {groupByDate(journal).map((group) => (
+                <div key={group.label} className="space-y-3">
+                  <h3 className="px-1 text-xs font-600 uppercase tracking-widest text-stone-400">
+                    {group.label}
+                  </h3>
+                  {group.items.map((r) => (
+                    <article
+                      key={r.id}
+                      className="group rounded-2xl bg-white/60 p-5 ring-1 ring-white/60 backdrop-blur"
                     >
-                      Remove
-                    </button>
-                  </div>
-                  <p className="mt-2 text-sm italic text-stone-500">“{r.entry}”</p>
-                  <p className="mt-3 font-serif text-lg leading-relaxed text-stone-700">
-                    {r.affirmation}
-                  </p>
-                </article>
+                      <div className="flex items-start justify-between gap-3">
+                        <time className="text-xs uppercase tracking-wider text-stone-400">
+                          {formatTime(r.ts)}
+                        </time>
+                        <button
+                          onClick={() => deleteEntry(r.id)}
+                          className="text-xs text-stone-300 opacity-0 transition hover:text-rose-400 group-hover:opacity-100"
+                          aria-label="Delete entry"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <p className="mt-2 text-sm italic text-stone-500">“{r.entry}”</p>
+                      <p className="mt-3 font-serif text-lg leading-relaxed text-stone-700">
+                        {r.affirmation}
+                      </p>
+                    </article>
+                  ))}
+                </div>
               ))}
             </div>
           )}

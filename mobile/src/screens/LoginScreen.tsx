@@ -10,6 +10,8 @@ import {
 import Svg, { Path } from 'react-native-svg'
 import SunMark from '../components/SunMark'
 import GradientButton from '../components/GradientButton'
+import CountryPicker from '../components/CountryPicker'
+import { COUNTRIES, formatPhone } from '../countries'
 import { useAuth, type Confirmation } from '../auth/AuthContext'
 import { colors, fonts } from '../theme'
 
@@ -18,8 +20,10 @@ type Step = 'choose' | 'phone' | 'code'
 export default function LoginScreen() {
   const { signInWithGoogle, signInWithPhone, signingIn } = useAuth()
   const [step, setStep] = useState<Step>('choose')
-  const [phone, setPhone] = useState('')
+  const [countryIso, setCountryIso] = useState('US')
+  const [phoneDigits, setPhoneDigits] = useState('')
   const [code, setCode] = useState('')
+  const country = COUNTRIES.find((c) => c.iso === countryIso) ?? COUNTRIES[0]
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -37,15 +41,16 @@ export default function LoginScreen() {
   }
 
   async function onSendCode() {
-    if (!phone.trim() || busy) return
+    if (!phoneDigits || busy) return
     setBusy(true)
     setError(null)
     try {
-      const conf = await signInWithPhone(phone.trim())
+      // Country code is prepended automatically → full E.164, e.g. +15550001234.
+      const conf = await signInWithPhone(`+${country.dial}${phoneDigits}`)
       setConfirmation(conf)
       setStep('code')
     } catch {
-      setError('Could not send a code. Include the country code, e.g. +1 555 000 0000.')
+      setError('Could not send a code. Please check the number and try again.')
     } finally {
       setBusy(false)
     }
@@ -100,20 +105,32 @@ export default function LoginScreen() {
 
         {step === 'phone' && (
           <View style={styles.stack}>
-            <TextInput
-              style={styles.input}
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="+1 555 000 0000"
-              placeholderTextColor={colors.stone400}
-              keyboardType="phone-pad"
-              autoFocus
-              editable={!loading}
-            />
+            <View style={styles.phoneRow}>
+              <CountryPicker
+                value={countryIso}
+                onChange={(iso) => {
+                  setCountryIso(iso)
+                  setError(null)
+                }}
+                disabled={loading}
+              />
+              <TextInput
+                style={[styles.input, styles.phoneInput]}
+                value={formatPhone(phoneDigits, country.dial)}
+                onChangeText={(t) =>
+                  setPhoneDigits(t.replace(/\D/g, '').slice(0, country.max))
+                }
+                placeholder={country.dial === '1' ? '(555) 000-0000' : 'Phone number'}
+                placeholderTextColor={colors.stone400}
+                keyboardType="phone-pad"
+                autoFocus
+                editable={!loading}
+              />
+            </View>
             <GradientButton
               label="Send code"
               onPress={onSendCode}
-              disabled={!phone.trim()}
+              disabled={!phoneDigits}
               loading={loading}
             />
             <Pressable onPress={() => setStep('choose')} hitSlop={8}>
@@ -231,6 +248,8 @@ const styles = StyleSheet.create({
     color: colors.stone700,
     textAlign: 'center',
   },
+  phoneRow: { flexDirection: 'row', gap: 6 },
+  phoneInput: { flex: 1, textAlign: 'left' },
   codeInput: { fontSize: 26, letterSpacing: 8 },
   hint: { fontFamily: fonts.sans, color: colors.stone500, fontSize: 15, textAlign: 'center' },
   link: { fontFamily: fonts.sans, color: colors.stone400, fontSize: 14, textAlign: 'center' },

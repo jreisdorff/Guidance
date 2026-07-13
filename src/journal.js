@@ -26,9 +26,11 @@ export function addEntry(uid, record) {
 // Subscribes to the user's entries (newest first). Returns an unsubscribe fn.
 export function subscribeEntries(uid, cb) {
   const q = query(entriesCol(uid), orderBy('ts', 'desc'))
-  return onSnapshot(q, (snap) => {
-    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
-  })
+  return onSnapshot(
+    q,
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (err) => console.error('journal subscription error:', err.code, err.message),
+  )
 }
 
 export function removeEntry(uid, id) {

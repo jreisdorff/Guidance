@@ -33,9 +33,12 @@ export function subscribeEntries(
   cb: (items: JournalItem[]) => void,
 ) {
   const q = query(entriesCol(uid), orderBy('ts', 'desc'))
-  return onSnapshot(q, (snap) => {
-    cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<JournalItem, 'id'>) })))
-  })
+  return onSnapshot(
+    q,
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<JournalItem, 'id'>) }))),
+    (err: { code?: string; message?: string }) =>
+      console.error('journal subscription error:', err.code, err.message),
+  )
 }
 
 export function removeEntry(uid: string, id: string) {

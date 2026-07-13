@@ -186,6 +186,17 @@ export default function App() {
       </div>
 
       <main className="relative mx-auto flex min-h-full max-w-2xl flex-col px-6 pb-16 pt-12 sm:pt-20">
+        {/* Sign out — top right */}
+        <button
+          onClick={async () => {
+            await signOut(auth)
+            reset()
+          }}
+          className="absolute right-6 top-6 z-10 text-sm font-600 text-stone-400 underline-offset-2 transition hover:text-stone-600 hover:underline sm:top-8"
+        >
+          Sign out
+        </button>
+
         {/* Header */}
         <header className="animate-rise text-center">
           <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center">
@@ -359,19 +370,10 @@ export default function App() {
 
         <footer className="mt-auto pt-16 text-center text-xs text-stone-400">
           {mode === 'ai' && aiAvailable ? (
-            <p>Affirmations are written live by LLM 🌅</p>
+            <p>Affirmations are written live 🌅</p>
           ) : (
             <p>Everything you write stays on this device. Only for you. 🌅</p>
           )}
-          <button
-            onClick={async () => {
-              await signOut(auth)
-              reset()
-            }}
-            className="mt-3 text-stone-400 underline-offset-2 transition hover:text-stone-600 hover:underline"
-          >
-            Sign out
-          </button>
         </footer>
       </main>
     </div>

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Nunito+Sans:wght@400;500;600;700&display=block"
+      rel="stylesheet"
+    />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1200px; height: 630px; }
+      .card {
+        position: relative;
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        background:
+          linear-gradient(135deg, #fffbeb 0%, #fff1f2 52%, #ffedd5 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Nunito Sans', sans-serif;
+      }
+      /* soft sunrise glows, echoing the app's Backdrop */
+      .glow {
+        position: absolute;
+        border-radius: 9999px;
+        filter: blur(90px);
+      }
+      .glow-amber {
+        width: 620px; height: 620px;
+        top: -220px; left: -140px;
+        background: rgba(253, 230, 138, 0.65);
+      }
+      .glow-rose {
+        width: 640px; height: 640px;
+        bottom: -260px; right: -160px;
+        background: rgba(254, 205, 211, 0.6);
+      }
+      .glow-orange {
+        width: 420px; height: 420px;
+        bottom: -180px; left: 34%;
+        background: rgba(254, 215, 170, 0.5);
+      }
+      .content {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 0 90px;
+      }
+      .sun { width: 132px; height: 132px; margin-bottom: 30px; }
+      .wordmark {
+        font-family: 'Fraunces', serif;
+        font-weight: 500;
+        font-size: 128px;
+        line-height: 1;
+        letter-spacing: -3px;
+        color: #292524;
+      }
+      .rule {
+        width: 132px;
+        height: 5px;
+        border-radius: 9999px;
+        margin: 34px 0 30px;
+        background: linear-gradient(90deg, #f59e0b, #f43f5e);
+      }
+      .tagline {
+        font-weight: 500;
+        font-size: 33px;
+        line-height: 1.45;
+        color: #78716c;
+        max-width: 820px;
+      }
+      .tagline em {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 400;
+        color: #57534e;
+      }
+      .footer {
+        position: absolute;
+        bottom: 40px;
+        left: 0; right: 0;
+        text-align: center;
+        font-weight: 600;
+        font-size: 20px;
+        letter-spacing: 0.5px;
+        color: #a8a29e;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="glow glow-amber"></div>
+      <div class="glow glow-orange"></div>
+      <div class="glow glow-rose"></div>
+
+      <div class="content">
+        <svg class="sun" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="sun" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#fbbf24" />
+              <stop offset="100%" stop-color="#f43f5e" />
+            </radialGradient>
+          </defs>
+          <circle cx="16" cy="16" r="8.5" fill="url(#sun)" />
+          <g stroke="#f59e0b" stroke-width="2" stroke-linecap="round" opacity="0.85">
+            <line x1="16" y1="2.5" x2="16" y2="5.5" />
+            <line x1="16" y1="26.5" x2="16" y2="29.5" />
+            <line x1="2.5" y1="16" x2="5.5" y2="16" />
+            <line x1="26.5" y1="16" x2="29.5" y2="16" />
+            <line x1="6.5" y1="6.5" x2="8.6" y2="8.6" />
+            <line x1="23.4" y1="23.4" x2="25.5" y2="25.5" />
+            <line x1="25.5" y1="6.5" x2="23.4" y2="8.6" />
+            <line x1="8.6" y1="23.4" x2="6.5" y2="25.5" />
+          </g>
+        </svg>
+
+        <div class="wordmark">Guidance</div>
+        <div class="rule"></div>
+        <div class="tagline">
+          A quiet, private space to set down what you're feeling &mdash; and be
+          reminded of the <em>worth that was always yours.</em>
+        </div>
+      </div>
+
+      <div class="footer">guidance-amber.vercel.app</div>
+    </div>
+  </body>
+</html>

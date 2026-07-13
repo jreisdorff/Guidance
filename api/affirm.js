@@ -1,6 +1,7 @@
 // Vercel serverless function: POST /api/affirm
 import { composeAffirmation, STATUS_FOR_CODE } from '../lib/claude.js'
 import { isAuthed } from '../lib/auth.js'
+import { isBearerAuthed } from '../lib/googleAuth.js'
 
 // Give Claude room to respond (default Vercel timeout is short).
 export const maxDuration = 30
@@ -9,7 +10,9 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'method_not_allowed' })
   }
-  if (!isAuthed(req)) {
+  // Web clients authenticate with the passcode cookie (lib/auth.js); mobile
+  // clients send a session JWT as `Authorization: Bearer` (lib/googleAuth.js).
+  if (!isAuthed(req) && !isBearerAuthed(req)) {
     return res.status(401).json({ error: 'unauthorized' })
   }
   try {

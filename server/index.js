@@ -15,6 +15,12 @@ import {
   authCookie,
   clearCookie,
 } from '../lib/auth.js'
+import {
+  verifyGoogleIdToken,
+  issueSessionToken,
+  isBearerAuthed,
+  STATUS_FOR_CODE as AUTH_STATUS_FOR_CODE,
+} from '../lib/googleAuth.js'
 
 const PORT = process.env.PORT || 8787
 
@@ -43,8 +49,23 @@ app.post('/api/logout', (_req, res) => {
   res.json({ ok: true })
 })
 
+// Mobile Google sign-in: verify the Google ID token, return our session JWT.
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    const user = await verifyGoogleIdToken(req.body?.idToken)
+    res.json({ token: issueSessionToken(user), user })
+  } catch (err) {
+    res
+      .status(AUTH_STATUS_FOR_CODE[err.code] || 401)
+      .json({ error: err.code || 'bad_google_token' })
+  }
+})
+
 app.post('/api/affirm', async (req, res) => {
-  if (!isAuthed(req)) return res.status(401).json({ error: 'unauthorized' })
+  // Web uses the passcode cookie; mobile sends a Bearer session JWT.
+  if (!isAuthed(req) && !isBearerAuthed(req)) {
+    return res.status(401).json({ error: 'unauthorized' })
+  }
   try {
     const data = await composeAffirmation(req.body || {})
     res.json(data)

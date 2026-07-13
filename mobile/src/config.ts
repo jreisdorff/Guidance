@@ -1,0 +1,18 @@
+// Runtime config, read from EXPO_PUBLIC_* env vars. Expo inlines any variable
+// prefixed with EXPO_PUBLIC_ at build time, so these are available in the bundle
+// (they are not secrets — Google OAuth *client IDs* are public by design).
+//
+// Set them in mobile/.env for local development, or per-profile in eas.json /
+// EAS project env vars for builds. See mobile/README.md.
+
+export const API_URL =
+  process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8787'
+
+// Web OAuth client ID — REQUIRED. The native Google Sign-In library returns an
+// ID token whose audience is this web client, and the backend verifies it.
+export const GOOGLE_WEB_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? ''
+
+// iOS OAuth client ID — required for the iOS build's native sign-in.
+export const GOOGLE_IOS_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? ''

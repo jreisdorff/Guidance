@@ -11,11 +11,6 @@ export type Guidance = {
   source: string
 }
 
-export type GoogleAuthResult = {
-  token: string
-  user: { sub: string; email?: string; name?: string; picture?: string }
-}
-
 export class ApiError extends Error {
   status: number
   code?: string
@@ -42,11 +37,6 @@ async function post<T>(path: string, body: unknown, token?: string): Promise<T> 
     throw new ApiError(res.status, (data as any)?.error)
   }
   return res.json() as Promise<T>
-}
-
-// Exchanges a Google ID token for our session token + user.
-export function exchangeGoogleToken(idToken: string) {
-  return post<GoogleAuthResult>('/api/auth/google', { idToken })
 }
 
 // Asks the backend for a piece of guidance for `entry`.

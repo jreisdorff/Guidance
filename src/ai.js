@@ -1,45 +1,18 @@
 // Talks to the backend (server/index.js locally, api/*.js on Vercel), which in
-// turn asks Claude and enforces the passcode gate. Nothing here holds an API
-// key or the passcode — those stay on the server.
+// turn asks Claude. Authentication is a Firebase ID token sent as a Bearer
+// header; the backend verifies it with the Firebase Admin SDK.
 
-// Returns { passcodeRequired, authed }. Never throws — assumes open on failure.
-export async function getSession() {
-  try {
-    const res = await fetch('/api/session', { credentials: 'same-origin' })
-    if (!res.ok) return { passcodeRequired: false, authed: true }
-    return res.json()
-  } catch {
-    return { passcodeRequired: false, authed: true }
-  }
-}
+import { auth } from './firebase.js'
 
-// Submits the passcode. Returns true on success.
-export async function login(passcode) {
-  try {
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ passcode }),
-    })
-    return res.ok
-  } catch {
-    return false
-  }
-}
-
-export async function logout() {
-  try {
-    await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' })
-  } catch {
-    /* ignore */
-  }
+async function authHeader() {
+  const token = await auth.currentUser?.getIdToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 // Returns { aiAvailable: boolean }. Never throws — assumes offline on failure.
 export async function checkAiAvailable() {
   try {
-    const res = await fetch('/api/health', { credentials: 'same-origin' })
+    const res = await fetch('/api/health')
     if (!res.ok) return false
     const data = await res.json()
     return Boolean(data.aiAvailable)
@@ -51,12 +24,11 @@ export async function checkAiAvailable() {
 // Asks the backend for an AI-written affirmation.
 // Returns { themeLabel, reflect, affirmation, source: 'ai' }.
 // Throws an Error with a `.status` (and `.reason`) on failure so the caller can
-// fall back to the local engine (or re-lock, on 401) and show the right message.
+// fall back to the local engine (or re-authenticate, on 401).
 export async function generateAffirmationAI(entry, lastAffirmation) {
   const res = await fetch('/api/affirm', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
     body: JSON.stringify({ entry, lastAffirmation }),
   })
 

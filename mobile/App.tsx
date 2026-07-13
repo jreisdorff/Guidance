@@ -19,7 +19,7 @@ import HomeScreen from './src/screens/HomeScreen'
 import { colors } from './src/theme'
 
 function Root() {
-  const { loading, token } = useAuth()
+  const { loading, user } = useAuth()
 
   if (loading) {
     return (
@@ -29,7 +29,7 @@ function Root() {
     )
   }
 
-  return token ? <HomeScreen /> : <LoginScreen />
+  return user ? <HomeScreen /> : <LoginScreen />
 }
 
 export default function App() {

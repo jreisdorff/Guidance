@@ -27,7 +27,7 @@ function formatDate(ts: number) {
 }
 
 export default function HomeScreen() {
-  const { token, signOut } = useAuth()
+  const { getToken, signOut } = useAuth()
   const scrollRef = useRef<ScrollView>(null)
   const [prompt] = useState(
     () => PROMPTS[Math.floor((Date.now() / 1000) % PROMPTS.length)],
@@ -41,10 +41,15 @@ export default function HomeScreen() {
   const [copied, setCopied] = useState(false)
 
   async function onSubmit() {
-    if (!token || !entry.trim() || loading) return
+    if (!entry.trim() || loading) return
     setLoading(true)
     setError(null)
     try {
+      const token = await getToken()
+      if (!token) {
+        await signOut()
+        return
+      }
       const guidance = await getGuidance(token, entry.trim(), result?.affirmation)
       setResult({ ...guidance, entry: entry.trim(), ts: Date.now() })
     } catch (err) {

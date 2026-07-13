@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { generateAffirmation } from './affirmations.js'
+import { checkAiAvailable, generateAffirmationAI } from './ai.js'
+import { auth } from './firebase.js'
 import {
-  checkAiAvailable,
-  generateAffirmationAI,
-  getSession,
-  login,
-  logout,
-} from './ai.js'
+  GoogleAuthProvider,
+  RecaptchaVerifier,
+  onAuthStateChanged,
+  signInWithPhoneNumber,
+  signInWithPopup,
+  signOut,
+} from 'firebase/auth'
 
 // A stable, per-device identifier. Generated once on this device and kept in
 // localStorage, so the journal below is scoped to this device rather than to a
@@ -70,16 +73,13 @@ export default function App() {
   const [aiAvailable, setAiAvailable] = useState(null) // null = unknown yet
   const [loading, setLoading] = useState(false)
   const [notice, setNotice] = useState(null)
-  const [authState, setAuthState] = useState('checking') // checking | locked | open
-  const [passcodeRequired, setPasscodeRequired] = useState(false)
+  const [user, setUser] = useState(undefined) // undefined = checking, null = signed out
   const resultRef = useRef(null)
 
   useEffect(() => {
-    getSession().then((s) => {
-      setPasscodeRequired(s.passcodeRequired)
-      setAuthState(s.passcodeRequired && !s.authed ? 'locked' : 'open')
-    })
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u))
     checkAiAvailable().then(setAiAvailable)
+    return unsub
   }, [])
 
   useEffect(() => {
@@ -110,7 +110,7 @@ export default function App() {
         return ai
       } catch (err) {
         if (err.status === 401) {
-          setAuthState('locked')
+          await signOut(auth) // session expired — the gate will take over
           return null
         }
         if (err.status === 503) {
@@ -137,7 +137,7 @@ export default function App() {
     setLoading(true)
     setNotice(null)
     const generated = await produce(text, result?.affirmation)
-    if (!generated) return setLoading(false) // re-locked; gate will take over
+    if (!generated) return setLoading(false) // signed out; gate will take over
     const record = { id: `${Date.now()}`, ts: Date.now(), entry: text, ...generated }
     setResult(record)
     setJournal((prev) => [record, ...prev].slice(0, 100))
@@ -170,11 +170,11 @@ export default function App() {
     }
   }
 
-  if (authState === 'checking') {
+  if (user === undefined) {
     return <Backdrop />
   }
-  if (authState === 'locked') {
-    return <PasscodeGate onUnlock={() => setAuthState('open')} />
+  if (user === null) {
+    return <SignIn />
   }
 
   return (
@@ -359,24 +359,19 @@ export default function App() {
 
         <footer className="mt-auto pt-16 text-center text-xs text-stone-400">
           {mode === 'ai' && aiAvailable ? (
-            <p>
-              Affirmations are written live 🌅
-            </p>
+            <p>Affirmations are written live by LLM 🌅</p>
           ) : (
             <p>Everything you write stays on this device. Only for you. 🌅</p>
           )}
-          {passcodeRequired && (
-            <button
-              onClick={async () => {
-                await logout()
-                reset()
-                setAuthState('locked')
-              }}
-              className="mt-3 text-stone-400 underline-offset-2 transition hover:text-stone-600 hover:underline"
-            >
-              Lock
-            </button>
-          )}
+          <button
+            onClick={async () => {
+              await signOut(auth)
+              reset()
+            }}
+            className="mt-3 text-stone-400 underline-offset-2 transition hover:text-stone-600 hover:underline"
+          >
+            Sign out
+          </button>
         </footer>
       </main>
     </div>
@@ -395,22 +390,61 @@ function Backdrop({ children }) {
   )
 }
 
-function PasscodeGate({ onUnlock }) {
+function SignIn() {
+  const [step, setStep] = useState('choose') // choose | phone | code
+  const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
-  const [error, setError] = useState(false)
+  const [confirmation, setConfirmation] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const recaptchaRef = useRef(null)
 
-  async function submit(e) {
-    e.preventDefault()
-    if (!code.trim() || busy) return
+  async function withGoogle() {
     setBusy(true)
-    setError(false)
-    const ok = await login(code)
-    setBusy(false)
-    if (ok) onUnlock()
-    else {
-      setError(true)
-      setCode('')
+    setError('')
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider())
+    } catch {
+      setError('Could not sign in with Google. Please try again.')
+      setBusy(false)
+    }
+  }
+
+  function getVerifier() {
+    if (!window._guidanceRecaptcha) {
+      window._guidanceRecaptcha = new RecaptchaVerifier(auth, recaptchaRef.current, {
+        size: 'invisible',
+      })
+    }
+    return window._guidanceRecaptcha
+  }
+
+  async function sendCode(e) {
+    e.preventDefault()
+    if (!phone.trim() || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      const conf = await signInWithPhoneNumber(auth, phone.trim(), getVerifier())
+      setConfirmation(conf)
+      setStep('code')
+    } catch {
+      setError('Could not send a code. Include the country code, e.g. +1 555 000 0000.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function confirmCode(e) {
+    e.preventDefault()
+    if (!code.trim() || busy || !confirmation) return
+    setBusy(true)
+    setError('')
+    try {
+      await confirmation.confirm(code.trim())
+    } catch {
+      setError('That code isn’t right. Try again.')
+      setBusy(false)
     }
   }
 
@@ -424,41 +458,113 @@ function PasscodeGate({ onUnlock }) {
           Guidance
         </h1>
         <p className="mx-auto mt-3 max-w-xs text-balance text-stone-500">
-          Enter your passcode to come in.
+          A quiet space to set down what you’re feeling. Sign in to come in.
         </p>
 
-        <form
-          onSubmit={submit}
-          className="mt-8 rounded-3xl bg-white/70 p-2 shadow-xl shadow-orange-900/5 ring-1 ring-white/60 backdrop-blur"
-        >
-          <input
-            type="password"
-            value={code}
-            onChange={(e) => {
-              setCode(e.target.value)
-              setError(false)
-            }}
-            autoFocus
-            autoComplete="current-password"
-            placeholder="Passcode"
-            className="w-full rounded-2xl bg-transparent px-4 py-3 text-center text-lg tracking-wide text-stone-700 placeholder:text-stone-400 focus:outline-none"
-          />
-          <button
-            type="submit"
-            disabled={!code.trim() || busy}
-            className="mt-1 w-full rounded-full bg-gradient-to-r from-amber-500 to-rose-500 px-6 py-3 font-600 text-white shadow-lg shadow-rose-500/20 transition hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {busy ? 'Opening…' : 'Enter'}
-          </button>
-        </form>
+        <div className="mt-8 rounded-3xl bg-white/70 p-6 shadow-xl shadow-orange-900/5 ring-1 ring-white/60 backdrop-blur">
+          {step === 'choose' && (
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={withGoogle}
+                disabled={busy}
+                className="flex items-center justify-center gap-3 rounded-full bg-white px-6 py-3 font-600 text-stone-700 shadow ring-1 ring-stone-200 transition hover:brightness-95 active:scale-[0.98] disabled:opacity-50"
+              >
+                <GoogleG />
+                Continue with Google
+              </button>
+              <button
+                onClick={() => {
+                  setStep('phone')
+                  setError('')
+                }}
+                disabled={busy}
+                className="rounded-full bg-gradient-to-r from-amber-500 to-rose-500 px-6 py-3 font-600 text-white shadow-lg shadow-rose-500/20 transition hover:brightness-105 active:scale-[0.98] disabled:opacity-50"
+              >
+                Continue with phone
+              </button>
+            </div>
+          )}
 
-        {error && (
-          <p className="animate-rise mt-4 text-sm text-rose-500">
-            That passcode isn’t right. Try again
-          </p>
-        )}
+          {step === 'phone' && (
+            <form onSubmit={sendCode} className="flex flex-col gap-3">
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                autoFocus
+                placeholder="+1 555 000 0000"
+                className="w-full rounded-2xl bg-white/70 px-4 py-3 text-center text-lg tracking-wide text-stone-700 placeholder:text-stone-400 ring-1 ring-white/60 focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!phone.trim() || busy}
+                className="rounded-full bg-gradient-to-r from-amber-500 to-rose-500 px-6 py-3 font-600 text-white shadow-lg shadow-rose-500/20 transition hover:brightness-105 active:scale-[0.98] disabled:opacity-40"
+              >
+                {busy ? 'Sending…' : 'Send code'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('choose')
+                  setError('')
+                }}
+                className="text-sm text-stone-400 transition hover:text-stone-600"
+              >
+                Back
+              </button>
+            </form>
+          )}
+
+          {step === 'code' && (
+            <form onSubmit={confirmCode} className="flex flex-col gap-3">
+              <p className="text-sm text-stone-500">Enter the code we texted you.</p>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                autoFocus
+                placeholder="123456"
+                className="w-full rounded-2xl bg-white/70 px-4 py-3 text-center text-2xl tracking-[0.4em] text-stone-700 placeholder:text-stone-300 ring-1 ring-white/60 focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!code.trim() || busy}
+                className="rounded-full bg-gradient-to-r from-amber-500 to-rose-500 px-6 py-3 font-600 text-white shadow-lg shadow-rose-500/20 transition hover:brightness-105 active:scale-[0.98] disabled:opacity-40"
+              >
+                {busy ? 'Verifying…' : 'Verify'}
+              </button>
+            </form>
+          )}
+        </div>
+
+        {error && <p className="animate-rise mt-4 text-sm text-rose-500">{error}</p>}
+        <div ref={recaptchaRef} />
       </div>
     </Backdrop>
+  )
+}
+
+function GoogleG() {
+  return (
+    <svg viewBox="0 0 48 48" className="h-5 w-5">
+      <path
+        fill="#EA4335"
+        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+      />
+      <path
+        fill="#4285F4"
+        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+      />
+    </svg>
   )
 }
 
@@ -498,9 +604,7 @@ function ModeToggle({ mode, setMode, aiAvailable }) {
 
 function SourceBadge({ source }) {
   if (source === 'ai') {
-    return (
-<></>
-    )
+    return <></>
   }
   return (
     <span className="shrink-0 rounded-full bg-stone-100 px-3 py-1 text-xs font-600 text-stone-500 ring-1 ring-stone-200/60">

@@ -9,10 +9,12 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.jreisdorff.guidance"
+      "bundleIdentifier": "com.jreisdorff.guidance",
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "package": "com.jreisdorff.guidance",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -40,7 +42,9 @@
           }
         }
       ],
-      "expo-font"
+      "expo-font",
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth"
     ],
     "extra": {
       "eas": {

@@ -1,8 +1,9 @@
-// App-wide auth state. Holds the session token + user, persists them in the
-// device keychain (expo-secure-store), and exposes signIn / signOut.
+// App-wide auth state, backed by React Native Firebase. Firebase persists the
+// session natively across restarts, so there's no manual token storage. Every
+// API call fetches a fresh Firebase ID token (they expire hourly).
 //
-// signIn: native Google picker -> Google ID token -> POST /api/auth/google ->
-// our session token, which we store and send as Bearer on later requests.
+// Google: native picker → Google ID token → Firebase credential.
+// Phone: Firebase sends an SMS code → we confirm it in LoginScreen.
 
 import {
   createContext,
@@ -11,89 +12,84 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import * as SecureStore from 'expo-secure-store'
 import {
-  signInWithGoogle,
-  signOutGoogle,
-  GoogleSignInCancelled,
-} from './google'
-import { exchangeGoogleToken, type GoogleAuthResult } from '../api/client'
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signInWithCredential,
+  signInWithPhoneNumber,
+  signOut as firebaseSignOut,
+} from '@react-native-firebase/auth'
+import { firebaseAuth } from './firebase'
+import { getGoogleIdToken, signOutGoogle, GoogleSignInCancelled } from './google'
 
-type User = GoogleAuthResult['user']
+// Types derived from the modular API (avoids mixing the deprecated
+// FirebaseAuthTypes namespace, whose shapes differ from the modular ones).
+export type FbUser = NonNullable<typeof firebaseAuth.currentUser>
+export type Confirmation = Awaited<ReturnType<typeof signInWithPhoneNumber>>
 
 type AuthState = {
-  loading: boolean // true while restoring a saved session on launch
-  token: string | null
-  user: User | null
+  loading: boolean // true while restoring the session on launch
+  user: FbUser | null
   signingIn: boolean
-  signIn: () => Promise<void>
+  signInWithGoogle: () => Promise<void>
+  signInWithPhone: (phoneNumber: string) => Promise<Confirmation>
   signOut: () => Promise<void>
+  getToken: () => Promise<string | null>
 }
-
-const TOKEN_KEY = 'guidance.session.token'
-const USER_KEY = 'guidance.session.user'
 
 const AuthContext = createContext<AuthState | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
-  const [token, setToken] = useState<string | null>(null)
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<FbUser | null>(null)
   const [signingIn, setSigningIn] = useState(false)
 
-  // Restore a saved session on launch.
   useEffect(() => {
-    ;(async () => {
-      try {
-        const [savedToken, savedUser] = await Promise.all([
-          SecureStore.getItemAsync(TOKEN_KEY),
-          SecureStore.getItemAsync(USER_KEY),
-        ])
-        if (savedToken) {
-          setToken(savedToken)
-          setUser(savedUser ? JSON.parse(savedUser) : null)
-        }
-      } catch {
-        // ignore — treat as logged out
-      } finally {
-        setLoading(false)
-      }
-    })()
+    const unsub = onAuthStateChanged(firebaseAuth, (u) => {
+      setUser(u)
+      setLoading(false)
+    })
+    return unsub
   }, [])
 
-  async function signIn() {
+  async function signInWithGoogle() {
     setSigningIn(true)
     try {
-      const idToken = await signInWithGoogle()
-      const { token: sessionToken, user: signedInUser } =
-        await exchangeGoogleToken(idToken)
-      await Promise.all([
-        SecureStore.setItemAsync(TOKEN_KEY, sessionToken),
-        SecureStore.setItemAsync(USER_KEY, JSON.stringify(signedInUser)),
-      ])
-      setToken(sessionToken)
-      setUser(signedInUser)
+      const idToken = await getGoogleIdToken()
+      const credential = GoogleAuthProvider.credential(idToken)
+      await signInWithCredential(firebaseAuth, credential)
     } catch (err) {
-      if (err instanceof GoogleSignInCancelled) return // user backed out — no-op
+      if (err instanceof GoogleSignInCancelled) return // user backed out
       throw err
     } finally {
       setSigningIn(false)
     }
   }
 
+  function signInWithPhone(phoneNumber: string) {
+    return signInWithPhoneNumber(firebaseAuth, phoneNumber)
+  }
+
   async function signOut() {
     await signOutGoogle()
-    await Promise.all([
-      SecureStore.deleteItemAsync(TOKEN_KEY),
-      SecureStore.deleteItemAsync(USER_KEY),
-    ])
-    setToken(null)
-    setUser(null)
+    await firebaseSignOut(firebaseAuth)
+  }
+
+  async function getToken() {
+    return (await firebaseAuth.currentUser?.getIdToken()) ?? null
   }
 
   return (
     <AuthContext.Provider
-      value={{ loading, token, user, signingIn, signIn, signOut }}
+      value={{
+        loading,
+        user,
+        signingIn,
+        signInWithGoogle,
+        signInWithPhone,
+        signOut,
+        getToken,
+      }}
     >
       {children}
     </AuthContext.Provider>

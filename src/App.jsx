@@ -428,8 +428,12 @@ function SignIn() {
       const conf = await signInWithPhoneNumber(auth, phone.trim(), getVerifier())
       setConfirmation(conf)
       setStep('code')
-    } catch {
-      setError('Could not send a code. Include the country code, e.g. +1 555 000 0000.')
+    } catch (err) {
+      console.error('phone sign-in:', err)
+      setError(
+        `Could not send a code (${err?.code || err?.message || 'unknown'}). ` +
+          'Use the country code, e.g. +1 555 000 0000.',
+      )
     } finally {
       setBusy(false)
     }

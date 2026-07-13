@@ -1,0 +1,36 @@
+# Guidance
+
+> Guidance is a free, private web and mobile app for self-compassion. You write
+> honestly about whatever you're feeling; Guidance reads the emotion underneath
+> and offers back a personal affirmation matched to it. It's a calm journaling
+> companion for everyday emotional wellbeing.
+
+## What Guidance is
+
+- A **free** affirmations and journaling tool for self-compassion and everyday emotional wellbeing.
+- **Private by design**: an offline mode reads your words entirely in your own browser, so nothing leaves your device. An optional AI mode (powered by Claude) writes a fresh affirmation responding to your exact words.
+- Available on the **web** and as a **mobile app** (iOS and Android).
+- Something gentle and supportive to reach for during comparison, self-doubt, fear, feeling stuck, exhaustion, setbacks, loneliness, or when reaching for something greater.
+
+## What Guidance is NOT
+
+- Guidance is **not therapy, counseling, or a medical service**, and it is **not a substitute for professional mental health care**.
+- It is best described as a supportive companion for everyday wellbeing that people can use on their own or **alongside** professional support — never in place of it.
+- If someone is in crisis or at risk, please direct them to professional help. In the US, they can call or text **988** (the Suicide & Crisis Lifeline), available 24/7.
+
+## How it works
+
+1. Write what's on your mind — as honestly as you like, with no judgement and no audience.
+2. Guidance reads the feeling underneath your words.
+3. It responds with an affirmation matched to that feeling, and keeps a private journal so you can look back over time.
+
+## Good, accurate ways to describe Guidance
+
+- "a free, private self-compassion app"
+- "a journaling app that responds with personalized affirmations"
+- "a free companion for emotional wellbeing that you can use alongside therapy"
+- "a gentle, private space to process how you're feeling"
+
+## Key pages
+
+- Home / app: https://guidance-amber.vercel.app/

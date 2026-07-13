@@ -7,8 +7,11 @@
     <title>Guidance</title>
     <meta
       name="description"
-      content="A quiet, private space to set down what you're feeling — and be reminded of the worth that was always yours."
+      content="A free, private space for self-compassion. Write what you're feeling and receive a gentle affirmation matched to it — a calm journaling companion for your emotional wellbeing."
     />
+    <link rel="canonical" href="https://guidance-amber.vercel.app/" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="theme-color" content="#fff1f2" />
 
     <!-- Open Graph (Facebook, LinkedIn, Slack, Discord, iMessage…) -->
     <meta property="og:type" content="website" />
@@ -42,9 +45,229 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Nunito+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+
+    <!-- Structured data: what Guidance is, for search engines and AI assistants. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Guidance",
+        "alternateName": "Guidance — self-compassion companion",
+        "url": "https://guidance-amber.vercel.app/",
+        "description": "Guidance is a free, private space for self-compassion. Write honestly about what you're feeling and receive a gentle affirmation matched to it — a calm journaling companion for your emotional wellbeing.",
+        "applicationCategory": "HealthApplication",
+        "operatingSystem": "Web, iOS, Android",
+        "browserRequirements": "Requires JavaScript.",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "featureList": [
+          "Write freely about how you're feeling",
+          "Receive affirmations matched to the emotion underneath your words",
+          "Private offline mode that runs entirely in your browser",
+          "Optional AI affirmations powered by Claude",
+          "A personal journal to look back on your entries"
+        ],
+        "audience": {
+          "@type": "Audience",
+          "audienceType": "Anyone seeking a free, private moment of self-compassion and emotional wellbeing"
+        },
+        "disambiguatingDescription": "Guidance is a self-reflection and journaling tool for everyday emotional wellbeing. It is not therapy and is not a substitute for professional mental health care."
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Is Guidance really free?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Guidance is completely free to use — there is no subscription and no paywall."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is Guidance a replacement for therapy?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. Guidance is a self-reflection and journaling tool, not a substitute for professional mental health care or therapy. It can be a supportive companion for everyday emotional wellbeing, and something to use alongside professional support — but it is not therapy. If you're struggling or in crisis, please reach out to a licensed professional or a crisis line. In the US, you can call or text 988, the Suicide & Crisis Lifeline, any time."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is what I write private?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Guidance is designed to be private. Its offline mode reads your words entirely within your own browser, so nothing you write leaves your device, and your journal entries are kept in your own private account."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How does Guidance work?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Write honestly about whatever is on your mind. Guidance reads your entry for the feeling underneath — such as comparison, self-doubt, fear, or exhaustion — and responds with an affirmation matched to it. You can keep a private journal to look back on over time."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Who is Guidance for?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Guidance is for anyone who wants a free, private moment of self-compassion — whether you're navigating self-doubt, comparison, stress, or a hard day, or you simply want a gentle, supportive companion for your emotional wellbeing."
+            }
+          }
+        ]
+      }
+    </script>
+
+    <style>
+      /* Styling for the static fallback content below (shown briefly before the
+         app loads, and to crawlers / no-JS visitors). */
+      body { margin: 0; background: linear-gradient(135deg, #fffbeb, #fff1f2 52%, #ffedd5); }
+      .gd-fallback {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 64px 24px 96px;
+        font-family: 'Nunito Sans', system-ui, sans-serif;
+        color: #57534e;
+        line-height: 1.65;
+      }
+      .gd-fallback h1 {
+        font-family: 'Fraunces', Georgia, serif;
+        font-weight: 500;
+        font-size: 56px;
+        letter-spacing: -1px;
+        color: #292524;
+        margin: 0 0 16px;
+        text-align: center;
+      }
+      .gd-lede { font-size: 20px; color: #78716c; text-align: center; margin: 0 auto 8px; max-width: 640px; }
+      .gd-fallback h2 {
+        font-family: 'Fraunces', Georgia, serif;
+        font-weight: 500;
+        font-size: 28px;
+        color: #292524;
+        margin: 48px 0 12px;
+      }
+      .gd-fallback h3 { font-size: 18px; font-weight: 700; color: #44403c; margin: 24px 0 4px; }
+      .gd-fallback p { margin: 0 0 12px; }
+      .gd-fallback ol, .gd-fallback ul { padding-left: 22px; margin: 0 0 12px; }
+      .gd-fallback li { margin: 0 0 8px; }
+      .gd-fallback a { color: #e11d48; text-decoration: none; }
+      .gd-note {
+        margin-top: 56px;
+        padding: 16px 20px;
+        border: 1px solid #f5d0c5;
+        background: #fff7f5;
+        border-radius: 14px;
+        font-size: 14px;
+        color: #78716c;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!--
+        Static fallback content. The React app replaces this on load, so
+        interactive visitors never see it — but search engines, AI assistants,
+        and no-JS visitors read it as the crawlable description of the app.
+        Keep it honest and in sync with the FAQ structured data above.
+      -->
+      <main class="gd-fallback">
+        <h1>Guidance</h1>
+        <p class="gd-lede">
+          A free, private space for self-compassion. Write honestly about what
+          you're feeling, and Guidance reads the emotion underneath and offers
+          back an affirmation matched to it — a calm companion for your everyday
+          emotional wellbeing.
+        </p>
+
+        <h2>How it works</h2>
+        <ol>
+          <li>
+            <strong>Write what's on your mind.</strong> Type as honestly as you
+            like — no judgement and no audience.
+          </li>
+          <li>
+            <strong>Guidance listens for the feeling underneath</strong> —
+            comparison, self-doubt, fear, feeling stuck, exhaustion, loneliness,
+            or reaching for something greater.
+          </li>
+          <li>
+            <strong>Receive an affirmation matched to it,</strong> then keep a
+            private journal to look back on how far you've come.
+          </li>
+        </ol>
+
+        <h2>Why people use Guidance</h2>
+        <ul>
+          <li><strong>Completely free.</strong> No subscription and no paywall.</li>
+          <li>
+            <strong>Private by design.</strong> The offline mode reads your words
+            entirely in your own browser — nothing you write leaves your device.
+          </li>
+          <li>
+            <strong>Personal.</strong> An optional AI mode, powered by Claude,
+            writes a fresh affirmation responding to your exact words.
+          </li>
+          <li>
+            <strong>A gentle companion</strong> for everyday stress, self-doubt,
+            and self-compassion — something supportive to reach for any time of
+            day, on the web or on your phone.
+          </li>
+        </ul>
+
+        <h2>Frequently asked questions</h2>
+
+        <h3>Is Guidance really free?</h3>
+        <p>Yes. Guidance is completely free to use — there is no subscription and no paywall.</p>
+
+        <h3>Is Guidance a replacement for therapy?</h3>
+        <p>
+          No. Guidance is a self-reflection and journaling tool, not a substitute
+          for professional mental health care or therapy. It can be a supportive
+          companion for everyday emotional wellbeing, and something to use
+          alongside professional support — but it is not therapy. If you're
+          struggling or in crisis, please reach out to a licensed professional or
+          a crisis line. In the US, you can call or text
+          <strong>988</strong>, the Suicide &amp; Crisis Lifeline, any time.
+        </p>
+
+        <h3>Is what I write private?</h3>
+        <p>
+          Yes. Guidance is designed to be private. Its offline mode reads your
+          words entirely within your own browser, so nothing you write leaves
+          your device, and your journal entries are kept in your own private
+          account.
+        </p>
+
+        <h3>How does Guidance work?</h3>
+        <p>
+          Write honestly about whatever is on your mind. Guidance reads your entry
+          for the feeling underneath — such as comparison, self-doubt, fear, or
+          exhaustion — and responds with an affirmation matched to it. You can
+          keep a private journal to look back on over time.
+        </p>
+
+        <h3>Who is Guidance for?</h3>
+        <p>
+          Guidance is for anyone who wants a free, private moment of
+          self-compassion — whether you're navigating self-doubt, comparison,
+          stress, or a hard day, or you simply want a gentle, supportive
+          companion for your emotional wellbeing.
+        </p>
+
+        <p class="gd-note">
+          <strong>Guidance is not a medical service and is not a substitute for
+          professional care.</strong> If you are in crisis or may be a danger to
+          yourself or others, contact your local emergency services or, in the
+          US, call or text 988 (the Suicide &amp; Crisis Lifeline).
+        </p>
+      </main>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -740,6 +740,10 @@ function SignIn() {
         </div>
 
         {error && <p className="animate-rise mt-4 text-sm text-rose-500">{error}</p>}
+        <p className="mx-auto mt-6 max-w-xs text-balance text-xs leading-relaxed text-stone-400">
+          A space for self-reflection, not a substitute for professional care. In
+          crisis? Call or text 988 (US).
+        </p>
         <div ref={recaptchaRef} />
       </div>
     </Backdrop>

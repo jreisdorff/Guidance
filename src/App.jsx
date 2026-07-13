@@ -421,7 +421,7 @@ function PasscodeGate({ onUnlock }) {
           <SunMark />
         </div>
         <h1 className="font-serif text-4xl font-500 tracking-tight text-stone-800">
-          Divinity
+          Guidance
         </h1>
         <p className="mx-auto mt-3 max-w-xs text-balance text-stone-500">
           Enter your passcode to come in.

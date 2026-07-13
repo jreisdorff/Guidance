@@ -360,7 +360,7 @@ export default function App() {
         <footer className="mt-auto pt-16 text-center text-xs text-stone-400">
           {mode === 'ai' && aiAvailable ? (
             <p>
-              Affirmations are written live by LLM 🌅
+              Affirmations are written live 🌅
             </p>
           ) : (
             <p>Everything you write stays on this device. Only for you. 🌅</p>

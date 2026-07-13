@@ -505,7 +505,15 @@ function SignIn() {
   const [confirmation, setConfirmation] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [cooldown, setCooldown] = useState(0) // seconds until "Resend" re-enables
   const recaptchaRef = useRef(null)
+
+  // Tick the resend cooldown down to zero.
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [cooldown])
 
   async function withGoogle() {
     setBusy(true)
@@ -527,10 +535,20 @@ function SignIn() {
     return window._guidanceRecaptcha
   }
 
+  // The invisible reCAPTCHA token is single-use, so a resend needs a fresh
+  // verifier — otherwise Firebase rejects the second attempt.
+  function resetVerifier() {
+    try {
+      window._guidanceRecaptcha?.clear()
+    } catch {
+      // clear() throws if the widget is already gone; ignore.
+    }
+    window._guidanceRecaptcha = null
+  }
+
   const country = COUNTRIES.find((c) => c.iso === countryIso) ?? COUNTRIES[0]
 
-  async function sendCode(e) {
-    e.preventDefault()
+  async function requestCode() {
     if (!phoneDigits || busy) return
     setBusy(true)
     setError('')
@@ -540,16 +558,37 @@ function SignIn() {
       const conf = await signInWithPhoneNumber(auth, e164, getVerifier())
       setConfirmation(conf)
       setStep('code')
+      setCode('')
+      setCooldown(30)
     } catch (err) {
       console.error('phone sign-in:', err)
+      resetVerifier() // so the next attempt gets a fresh challenge
       setError(`Could not send a code (${err?.code || err?.message || 'unknown'}).`)
     } finally {
       setBusy(false)
     }
   }
 
-  async function confirmCode(e) {
+  function sendCode(e) {
     e.preventDefault()
+    requestCode()
+  }
+
+  async function resend() {
+    if (cooldown > 0 || busy) return
+    resetVerifier()
+    await requestCode()
+  }
+
+  function changeNumber() {
+    setStep('phone')
+    setCode('')
+    setConfirmation(null)
+    setError('')
+  }
+
+  async function confirmCode(e) {
+    e?.preventDefault()
     if (!code.trim() || busy || !confirmation) return
     setBusy(true)
     setError('')
@@ -560,6 +599,14 @@ function SignIn() {
       setBusy(false)
     }
   }
+
+  // Auto-submit once a full 6-digit code is present (covers browser SMS autofill).
+  useEffect(() => {
+    if (step === 'code' && code.length === 6 && !busy && confirmation) {
+      confirmCode()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code])
 
   return (
     <Backdrop>
@@ -645,12 +692,19 @@ function SignIn() {
 
           {step === 'code' && (
             <form onSubmit={confirmCode} className="flex flex-col gap-3">
-              <p className="text-sm text-stone-500">Enter the code we texted you.</p>
+              <p className="text-sm text-stone-500">
+                Enter the code we texted to{' '}
+                <span className="font-600 text-stone-700">
+                  +{country.dial} {formatPhone(phoneDigits, country.dial)}
+                </span>
+                .
+              </p>
               <input
                 type="text"
                 inputMode="numeric"
+                autoComplete="one-time-code"
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 autoFocus
                 placeholder="123456"
                 className="w-full rounded-2xl bg-white/70 px-4 py-3 text-center text-2xl tracking-[0.4em] text-stone-700 placeholder:text-stone-300 ring-1 ring-white/60 focus:outline-none"
@@ -662,6 +716,25 @@ function SignIn() {
               >
                 {busy ? 'Verifying…' : 'Verify'}
               </button>
+              <div className="flex items-center justify-center gap-4 text-sm">
+                <button
+                  type="button"
+                  onClick={changeNumber}
+                  disabled={busy}
+                  className="text-stone-400 transition hover:text-stone-600 disabled:opacity-50"
+                >
+                  Change number
+                </button>
+                <span className="text-stone-300">·</span>
+                <button
+                  type="button"
+                  onClick={resend}
+                  disabled={cooldown > 0 || busy}
+                  className="text-stone-400 transition hover:text-stone-600 disabled:opacity-50 disabled:hover:text-stone-400"
+                >
+                  {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
+                </button>
+              </div>
             </form>
           )}
         </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Pressable,
@@ -27,6 +27,14 @@ export default function LoginScreen() {
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [cooldown, setCooldown] = useState(0) // seconds until "Resend" re-enables
+
+  // Tick the resend cooldown down to zero.
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [cooldown])
 
   async function onGoogle() {
     setBusy(true)
@@ -40,7 +48,7 @@ export default function LoginScreen() {
     }
   }
 
-  async function onSendCode() {
+  async function requestCode() {
     if (!phoneDigits || busy) return
     setBusy(true)
     setError(null)
@@ -49,11 +57,29 @@ export default function LoginScreen() {
       const conf = await signInWithPhone(`+${country.dial}${phoneDigits}`)
       setConfirmation(conf)
       setStep('code')
+      setCode('')
+      setCooldown(30)
     } catch {
       setError('Could not send a code. Please check the number and try again.')
     } finally {
       setBusy(false)
     }
+  }
+
+  function onSendCode() {
+    requestCode()
+  }
+
+  async function onResend() {
+    if (cooldown > 0 || busy) return
+    await requestCode()
+  }
+
+  function changeNumber() {
+    setStep('phone')
+    setCode('')
+    setConfirmation(null)
+    setError(null)
   }
 
   async function onConfirm() {
@@ -70,6 +96,14 @@ export default function LoginScreen() {
   }
 
   const loading = busy || signingIn
+
+  // Auto-submit once a full 6-digit code is present (covers SMS autofill).
+  useEffect(() => {
+    if (step === 'code' && code.length === 6 && !loading && confirmation) {
+      onConfirm()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code])
 
   return (
     <View style={styles.container}>
@@ -143,14 +177,20 @@ export default function LoginScreen() {
 
         {step === 'code' && (
           <View style={styles.stack}>
-            <Text style={styles.hint}>Enter the code we texted you.</Text>
+            <Text style={styles.hint}>
+              Enter the code we texted to +{country.dial}{' '}
+              {formatPhone(phoneDigits, country.dial)}.
+            </Text>
             <TextInput
               style={[styles.input, styles.codeInput]}
               value={code}
-              onChangeText={setCode}
+              onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 6))}
               placeholder="123456"
               placeholderTextColor={colors.stone300}
               keyboardType="number-pad"
+              textContentType="oneTimeCode"
+              autoComplete="sms-otp"
+              maxLength={6}
               autoFocus
               editable={!loading}
             />
@@ -160,6 +200,16 @@ export default function LoginScreen() {
               disabled={!code.trim()}
               loading={loading}
             />
+            <View style={styles.codeActions}>
+              <Pressable onPress={changeNumber} hitSlop={8} disabled={loading}>
+                <Text style={styles.link}>Change number</Text>
+              </Pressable>
+              <Pressable onPress={onResend} hitSlop={8} disabled={cooldown > 0 || loading}>
+                <Text style={[styles.link, (cooldown > 0 || loading) && styles.linkDisabled]}>
+                  {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
+                </Text>
+              </Pressable>
+            </View>
           </View>
         )}
       </View>
@@ -255,6 +305,13 @@ const styles = StyleSheet.create({
   codeInput: { fontSize: 26, letterSpacing: 8 },
   hint: { fontFamily: fonts.sans, color: colors.stone500, fontSize: 15, textAlign: 'center' },
   link: { fontFamily: fonts.sans, color: colors.stone400, fontSize: 14, textAlign: 'center' },
+  linkDisabled: { opacity: 0.5 },
+  codeActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 20,
+    marginTop: 2,
+  },
   error: {
     fontFamily: fonts.sans,
     color: colors.rose500,

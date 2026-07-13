@@ -84,6 +84,7 @@ export default function LoginScreen() {
       <View style={styles.card}>
         {step === 'choose' && (
           <View style={styles.stack}>
+            {/* TODO: re-enable later
             <Pressable
               style={({ pressed }) => [styles.googleBtn, pressed && styles.pressed]}
               onPress={onGoogle}
@@ -92,6 +93,7 @@ export default function LoginScreen() {
               <GoogleG />
               <Text style={styles.googleText}>Continue with Google</Text>
             </Pressable>
+            */}
             <GradientButton
               label="Continue with phone"
               onPress={() => {

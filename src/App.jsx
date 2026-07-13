@@ -577,6 +577,7 @@ function SignIn() {
         <div className="mt-8 rounded-3xl bg-white/70 p-6 shadow-xl shadow-orange-900/5 ring-1 ring-white/60 backdrop-blur">
           {step === 'choose' && (
             <div className="flex flex-col gap-3">
+              {/* TODO: re-enable later
               <button
                 onClick={withGoogle}
                 disabled={busy}
@@ -585,6 +586,7 @@ function SignIn() {
                 <GoogleG />
                 Continue with Google
               </button>
+              */}
               <button
                 onClick={() => {
                   setStep('phone')

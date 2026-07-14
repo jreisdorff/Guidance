@@ -33,4 +33,4 @@
 
 ## Key pages
 
-- Home / app: https://guidance-amber.vercel.app/
+- Home / app: https://guidances.net/

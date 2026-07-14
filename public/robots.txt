@@ -1,4 +1,4 @@
-# Guidance — https://guidance-amber.vercel.app/
+# Guidance — https://guidances.net/
 # We want to be discoverable in both search engines and AI assistants,
 # so all crawlers (including AI/LLM crawlers) are welcome.
 
@@ -42,4 +42,4 @@ Allow: /
 User-agent: CCBot
 Allow: /
 
-Sitemap: https://guidance-amber.vercel.app/sitemap.xml
+Sitemap: https://guidances.net/sitemap.xml

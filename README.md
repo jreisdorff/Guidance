@@ -36,6 +36,7 @@ npm install
    cp .env.example .env
    # then edit .env and set ANTHROPIC_API_KEY=sk-ant-...
    ```
+   
 
 2. Start both the web app and the backend together:
 

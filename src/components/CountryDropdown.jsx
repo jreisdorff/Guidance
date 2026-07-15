@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import { useI18n } from '../i18n.jsx'
 import { COUNTRIES } from '../phone.js'
 
 // Custom country picker: collapsed shows flag + code + ISO abbreviation
 // (e.g. "🇺🇸 +1 US"); expanded lists flag + code + full country name. A native
 // <select> can't differ between the two, hence the custom control.
 export function CountryDropdown({ value, onChange }) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const selected = COUNTRIES.find((c) => c.iso === value) ?? COUNTRIES[0]
@@ -23,7 +25,7 @@ export function CountryDropdown({ value, onChange }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label="Country code"
+        aria-label={t('countryCode')}
         className="flex items-center gap-1.5 rounded-2xl bg-white/70 px-3 py-3 text-sm text-stone-700 ring-1 ring-white/60 focus:outline-none"
       >
         <span>{selected.flag}</span>

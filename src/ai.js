@@ -21,15 +21,15 @@ export async function checkAiAvailable() {
   }
 }
 
-// Asks the backend for an AI-written affirmation.
-// Returns { themeLabel, reflect, affirmation, source: 'ai' }.
+// Asks the backend for an AI-written affirmation, in the given language ('en' |
+// 'es'). Returns { themeLabel, reflect, affirmation, source: 'ai' }.
 // Throws an Error with a `.status` (and `.reason`) on failure so the caller can
 // fall back to the local engine (or re-authenticate, on 401).
-export async function generateAffirmationAI(entry, lastAffirmation) {
+export async function generateAffirmationAI(entry, lastAffirmation, lang) {
   const res = await fetch('/api/affirm', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-    body: JSON.stringify({ entry, lastAffirmation }),
+    body: JSON.stringify({ entry, lastAffirmation, lang }),
   })
 
   if (!res.ok) {

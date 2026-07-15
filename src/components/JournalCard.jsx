@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { formatTime } from '../format.js'
+import { useI18n } from '../i18n.jsx'
 
 // One journal moment as an accordion: the collapsed preview shows what was
 // written (with time + a "N ways" badge for re-phrased moments); expanding
 // reveals the affirmation response(s). Remove stays at the top-right.
 export function JournalCard({ group: g, onRequestRemove }) {
+  const { t, lang } = useI18n()
   const [open, setOpen] = useState(false)
 
   return (
@@ -26,10 +28,12 @@ export function JournalCard({ group: g, onRequestRemove }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-3">
               <time className="text-xs uppercase tracking-wider text-stone-400">
-                {formatTime(g.items[0].ts)}
+                {formatTime(g.items[0].ts, lang)}
               </time>
               {g.items.length > 1 && (
-                <span className="text-xs text-stone-300">{g.items.length} ways</span>
+                <span className="text-xs text-stone-300">
+                  {t('waysCount', { n: g.items.length })}
+                </span>
               )}
             </div>
             <p className="mt-2 text-sm italic text-stone-500">“{g.entry}”</p>
@@ -38,9 +42,9 @@ export function JournalCard({ group: g, onRequestRemove }) {
         <button
           onClick={() => onRequestRemove(g.items.map((it) => it.id))}
           className="shrink-0 text-xs text-stone-400 transition hover:text-rose-500"
-          aria-label="Remove this entry"
+          aria-label={t('remove')}
         >
-          Remove
+          {t('remove')}
         </button>
       </div>
       {open && (

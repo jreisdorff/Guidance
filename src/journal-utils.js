@@ -3,10 +3,10 @@
 import { dateLabel } from './format.js'
 
 // Groups entries (already sorted newest-first) into consecutive day buckets.
-export function groupByDate(entries) {
+export function groupByDate(entries, locale = 'en') {
   const groups = []
   for (const e of entries) {
-    const label = dateLabel(e.ts)
+    const label = dateLabel(e.ts, locale)
     const last = groups[groups.length - 1]
     if (last && last.label === label) last.items.push(e)
     else groups.push({ label, items: [e] })

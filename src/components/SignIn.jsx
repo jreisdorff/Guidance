@@ -6,12 +6,15 @@ import {
   signInWithPopup,
 } from 'firebase/auth'
 import { auth } from '../firebase.js'
+import { useI18n } from '../i18n.jsx'
 import { COUNTRIES, formatPhone } from '../phone.js'
 import { Backdrop } from './Backdrop.jsx'
 import { CountryDropdown } from './CountryDropdown.jsx'
+import { LanguageToggle } from './LanguageToggle.jsx'
 import { GoogleG, SunMark } from './icons.jsx'
 
 export function SignIn() {
+  const { t } = useI18n()
   const [step, setStep] = useState('choose') // choose | phone | code
   const [countryIso, setCountryIso] = useState('US')
   const [phoneDigits, setPhoneDigits] = useState('')
@@ -35,7 +38,7 @@ export function SignIn() {
     try {
       await signInWithPopup(auth, new GoogleAuthProvider())
     } catch {
-      setError('Could not sign in with Google. Please try again.')
+      setError(t('errGoogle'))
       setBusy(false)
     }
   }
@@ -77,7 +80,7 @@ export function SignIn() {
     } catch (err) {
       console.error('phone sign-in:', err)
       resetVerifier() // so the next attempt gets a fresh challenge
-      setError(`Could not send a code (${err?.code || err?.message || 'unknown'}).`)
+      setError(t('errSendCode', { reason: err?.code || err?.message || 'unknown' }))
     } finally {
       setBusy(false)
     }
@@ -109,7 +112,7 @@ export function SignIn() {
     try {
       await confirmation.confirm(code.trim())
     } catch {
-      setError('That code isn’t right. Try again.')
+      setError(t('errCode'))
       setBusy(false)
     }
   }
@@ -132,7 +135,7 @@ export function SignIn() {
           Guidance
         </h1>
         <p className="mx-auto mt-3 max-w-xs text-balance text-stone-500">
-          A quiet space to set down what you’re feeling. Sign in to come in.
+          {t('signInSubtitle')}
         </p>
 
         <div className="mt-8 rounded-3xl bg-white/70 p-6 shadow-xl shadow-orange-900/5 ring-1 ring-white/60 backdrop-blur">
@@ -156,7 +159,7 @@ export function SignIn() {
                 disabled={busy}
                 className="rounded-full bg-gradient-to-r from-amber-500 to-rose-500 px-6 py-3 font-600 text-white shadow-lg shadow-rose-500/20 transition hover:brightness-105 active:scale-[0.98] disabled:opacity-50"
               >
-                Continue with phone
+                {t('continuePhone')}
               </button>
             </div>
           )}
@@ -180,7 +183,7 @@ export function SignIn() {
                     )
                   }
                   autoFocus
-                  placeholder={country.dial === '1' ? '(555) 000-0000' : 'Phone number'}
+                  placeholder={country.dial === '1' ? '(555) 000-0000' : t('phonePlaceholder')}
                   className="w-full min-w-0 flex-1 rounded-2xl bg-white/70 pr-4 pl-2 py-3 text-left text-lg tracking-wide text-stone-700 placeholder:text-stone-400 ring-1 ring-white/60 focus:outline-none"
                 />
               </div>
@@ -189,7 +192,7 @@ export function SignIn() {
                 disabled={!phoneDigits || busy}
                 className="rounded-full bg-gradient-to-r from-amber-500 to-rose-500 px-6 py-3 font-600 text-white shadow-lg shadow-rose-500/20 transition hover:brightness-105 active:scale-[0.98] disabled:opacity-40"
               >
-                {busy ? 'Sending…' : 'Send code'}
+                {busy ? t('sending') : t('sendCode')}
               </button>
               <button
                 type="button"
@@ -199,7 +202,7 @@ export function SignIn() {
                 }}
                 className="text-sm text-stone-400 transition hover:text-stone-600"
               >
-                Back
+                {t('back')}
               </button>
             </form>
           )}
@@ -207,11 +210,11 @@ export function SignIn() {
           {step === 'code' && (
             <form onSubmit={confirmCode} className="flex flex-col gap-3">
               <p className="text-sm text-stone-500">
-                Enter the code we texted to{' '}
+                {t('codeSentTo').split('{number}')[0]}
                 <span className="font-600 text-stone-700">
                   +{country.dial} {formatPhone(phoneDigits, country.dial)}
                 </span>
-                .
+                {t('codeSentTo').split('{number}')[1]}
               </p>
               <input
                 type="text"
@@ -228,7 +231,7 @@ export function SignIn() {
                 disabled={!code.trim() || busy}
                 className="rounded-full bg-gradient-to-r from-amber-500 to-rose-500 px-6 py-3 font-600 text-white shadow-lg shadow-rose-500/20 transition hover:brightness-105 active:scale-[0.98] disabled:opacity-40"
               >
-                {busy ? 'Verifying…' : 'Verify'}
+                {busy ? t('verifying') : t('verify')}
               </button>
               <div className="flex items-center justify-center gap-4 text-sm">
                 <button
@@ -237,7 +240,7 @@ export function SignIn() {
                   disabled={busy}
                   className="text-stone-400 transition hover:text-stone-600 disabled:opacity-50"
                 >
-                  Change number
+                  {t('changeNumber')}
                 </button>
                 <span className="text-stone-300">·</span>
                 <button
@@ -246,7 +249,7 @@ export function SignIn() {
                   disabled={cooldown > 0 || busy}
                   className="text-stone-400 transition hover:text-stone-600 disabled:opacity-50 disabled:hover:text-stone-400"
                 >
-                  {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
+                  {cooldown > 0 ? t('resendIn', { n: cooldown }) : t('resendCode')}
                 </button>
               </div>
             </form>
@@ -255,14 +258,17 @@ export function SignIn() {
 
         {error && <p className="animate-rise mt-4 text-sm text-rose-500">{error}</p>}
         <p className="mx-auto mt-6 max-w-xs text-balance text-xs leading-relaxed text-stone-400">
-          A space for self-reflection, not a substitute for professional care. In
-          crisis? Call or text 988 (US).
+          {t('crisisNote')}
         </p>
         <p className="mx-auto mt-3 max-w-xs text-balance text-xs leading-relaxed text-stone-400">
-          By continuing you agree to our{' '}
-          <a href="/terms" className="underline hover:text-stone-500">Terms</a> and{' '}
-          <a href="/privacy" className="underline hover:text-stone-500">Privacy Policy</a>.
+          {t('agreeBefore')}
+          <a href="/terms" className="underline hover:text-stone-500">{t('terms')}</a>
+          {t('agreeAnd')}
+          <a href="/privacy" className="underline hover:text-stone-500">{t('privacyPolicy')}</a>.
         </p>
+        <div className="mt-6">
+          <LanguageToggle />
+        </div>
         <div ref={recaptchaRef} />
       </div>
     </Backdrop>

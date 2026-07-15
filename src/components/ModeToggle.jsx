@@ -1,5 +1,8 @@
+import { useI18n } from '../i18n.jsx'
+
 // Switches between AI-written ("Custom") and on-device ("Offline") affirmations.
 export function ModeToggle({ mode, setMode, aiAvailable }) {
+  const { t } = useI18n()
   return (
     <div className="mt-6 flex flex-col items-center gap-1.5">
       <div className="inline-flex rounded-full bg-white/60 p-1 text-sm shadow-sm ring-1 ring-white/60 backdrop-blur">
@@ -11,7 +14,7 @@ export function ModeToggle({ mode, setMode, aiAvailable }) {
               : 'text-stone-500 hover:text-stone-700'
           }`}
         >
-          ✨ Custom affirmations
+          {t('modeCustom')}
         </button>
         <button
           onClick={() => setMode('local')}
@@ -21,13 +24,11 @@ export function ModeToggle({ mode, setMode, aiAvailable }) {
               : 'text-stone-500 hover:text-stone-700'
           }`}
         >
-          🌿 Offline
+          {t('modeOffline')}
         </button>
       </div>
       {mode === 'ai' && aiAvailable === false && (
-        <p className="text-xs text-amber-700/70">
-          No API key found — add one to enable AI. Using the local engine.
-        </p>
+        <p className="text-xs text-amber-700/70">{t('aiUnavailableNote')}</p>
       )}
     </div>
   )

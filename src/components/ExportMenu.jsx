@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import { useI18n } from '../i18n.jsx'
 
 // A small "Export ▾" menu letting the user download their journal as either a
 // human-readable .txt or a machine-readable .json. Mirrors CountryDropdown's
 // open-state + outside-click pattern.
 export function ExportMenu({ onExport }) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -27,7 +29,7 @@ export function ExportMenu({ onExport }) {
         onClick={() => setOpen((o) => !o)}
         className="text-xs text-stone-400 transition hover:text-stone-600"
       >
-        Export ▾
+        {t('exportLabel')}
       </button>
       {open && (
         <div className="absolute right-0 z-20 mt-1 w-36 rounded-2xl bg-white p-1 text-left shadow-xl ring-1 ring-stone-200">
@@ -35,13 +37,13 @@ export function ExportMenu({ onExport }) {
             onClick={() => choose('txt')}
             className="block w-full rounded-xl px-3 py-2 text-left text-sm text-stone-700 transition hover:bg-stone-100"
           >
-            Text (.txt)
+            {t('exportTxt')}
           </button>
           <button
             onClick={() => choose('json')}
             className="block w-full rounded-xl px-3 py-2 text-left text-sm text-stone-700 transition hover:bg-stone-100"
           >
-            JSON (.json)
+            {t('exportJson')}
           </button>
         </div>
       )}

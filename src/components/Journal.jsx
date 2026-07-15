@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useI18n } from '../i18n.jsx'
 import { groupByDate, groupRephrasings, recentThemes } from '../journal-utils.js'
 import { ConfirmDialog } from './ConfirmDialog.jsx'
 import { ExportMenu } from './ExportMenu.jsx'
@@ -9,6 +10,7 @@ import { JournalCard } from './JournalCard.jsx'
 // Owns its own display state (open/closed, search query); the parent owns the
 // data and the delete/clear/export actions.
 export function Journal({ journal, onDelete, onClear, onExport }) {
+  const { t, lang } = useI18n()
   const [showJournal, setShowJournal] = useState(false)
   const [journalQuery, setJournalQuery] = useState('')
   const [activeThemes, setActiveThemes] = useState([])
@@ -52,7 +54,7 @@ export function Journal({ journal, onDelete, onClear, onExport }) {
           <span className={`transition-transform ${showJournal ? 'rotate-90' : ''}`}>
             ›
           </span>
-          Your journal
+          {t('yourJournal')}
           {journal.length > 0 && (
             <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs text-stone-400">
               {journal.length}
@@ -66,7 +68,7 @@ export function Journal({ journal, onDelete, onClear, onExport }) {
               onClick={() => setConfirm({ type: 'clear' })}
               className="text-xs text-stone-400 transition hover:text-rose-500"
             >
-              Clear all
+              {t('clearAll')}
             </button>
           </div>
         )}
@@ -76,22 +78,21 @@ export function Journal({ journal, onDelete, onClear, onExport }) {
         <div className="animate-rise mt-4 space-y-6">
           {journal.length === 0 && (
             <p className="rounded-2xl bg-white/50 px-5 py-6 text-center text-sm text-stone-400">
-              Nothing here yet. What you share will be saved to your account,
-              for you to return to.
+              {t('emptyJournal')}
             </p>
           )}
           {themes.length > 0 && (
             <div className="rounded-2xl bg-white/40 px-5 py-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs uppercase tracking-widest text-stone-400">
-                  Lately, you’ve been feeling
+                  {t('latelyFeeling')}
                 </p>
                 {activeThemes.length > 0 && (
                   <button
                     onClick={() => setActiveThemes([])}
                     className="text-xs text-stone-400 transition hover:text-stone-600"
                   >
-                    Clear filters
+                    {t('clearFilters')}
                   </button>
                 )}
               </div>
@@ -121,16 +122,16 @@ export function Journal({ journal, onDelete, onClear, onExport }) {
               type="search"
               value={journalQuery}
               onChange={(e) => setJournalQuery(e.target.value)}
-              placeholder="Search your journal…"
+              placeholder={t('searchPlaceholder')}
               className="w-full rounded-2xl bg-white/60 px-4 py-2.5 text-sm text-stone-700 ring-1 ring-white/60 placeholder:text-stone-400 focus:outline-none"
             />
           )}
           {filtering && filteredJournal.length === 0 && (
             <p className="rounded-2xl bg-white/50 px-5 py-6 text-center text-sm text-stone-400">
-              No entries match your filters.
+              {t('noMatches')}
             </p>
           )}
-          {groupByDate(filteredJournal).map((group) => (
+          {groupByDate(filteredJournal, lang).map((group) => (
             <div key={group.label} className="space-y-3">
               <h3 className="px-1 text-xs font-600 uppercase tracking-widest text-stone-400">
                 {group.label}
@@ -149,15 +150,16 @@ export function Journal({ journal, onDelete, onClear, onExport }) {
 
       <ConfirmDialog
         open={!!confirm}
-        title={confirm?.type === 'clear' ? 'Clear your journal?' : 'Remove this entry?'}
+        title={confirm?.type === 'clear' ? t('clearTitle') : t('removeTitle')}
         message={
           confirm?.type === 'clear'
-            ? 'Are you sure you want to remove your journal entries? This can’t be undone. If you’d like to keep them, cancel and Export first.'
+            ? t('clearMsg')
             : confirm?.ids?.length > 1
-              ? `Are you sure you want to remove this entry and its ${confirm.ids.length} affirmations? This can’t be undone.`
-              : 'Are you sure you want to remove this entry? This can’t be undone.'
+              ? t('removeMsgMulti', { n: confirm.ids.length })
+              : t('removeMsg')
         }
-        confirmLabel={confirm?.type === 'clear' ? 'Clear all' : 'Remove'}
+        confirmLabel={confirm?.type === 'clear' ? t('clearAll') : t('remove')}
+        cancelLabel={t('cancel')}
         onConfirm={runConfirm}
         onCancel={() => setConfirm(null)}
       />

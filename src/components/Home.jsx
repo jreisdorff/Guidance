@@ -5,30 +5,28 @@ import { checkAiAvailable, generateAffirmationAI } from '../ai.js'
 import { auth } from '../firebase.js'
 import { addEntry, removeEntry, subscribeEntries } from '../journal.js'
 import { deleteAccount } from '../account.js'
+import { useI18n } from '../i18n.jsx'
 import { AffirmationResult } from './AffirmationResult.jsx'
 import { Composer } from './Composer.jsx'
 import { Journal } from './Journal.jsx'
+import { LanguageToggle } from './LanguageToggle.jsx'
 import { ModeToggle } from './ModeToggle.jsx'
 import { SunMark } from './icons.jsx'
 
 // Mode preference stays in localStorage — it's just a device-level UI choice.
 const MODE_KEY = 'divinity.mode.v1'
 
-const PROMPTS = [
-  'What is weighing on you right now?',
-  'What are you feeling about yourself today?',
-  'What thought has been circling in your mind?',
-  'What is the critical voice saying to you?',
-  'What do you wish you could believe about yourself?',
-]
-
 // The signed-in experience: compose an affirmation, keep a journal. `user` is
 // guaranteed present here — App handles the auth gate.
 export function Home({ user }) {
+  const { t, lang } = useI18n()
   const [entry, setEntry] = useState('')
   const [result, setResult] = useState(null)
   const [journal, setJournal] = useState([])
-  const [prompt] = useState(() => PROMPTS[Math.floor((Date.now() / 1000) % PROMPTS.length)])
+  // Keep an index (not the text) so switching language re-localizes the prompt.
+  const [promptIndex] = useState(() =>
+    Math.floor((Date.now() / 1000) % t('prompts').length),
+  )
   const [mode, setMode] = useState(() => localStorage.getItem(MODE_KEY) || 'ai')
   const [aiAvailable, setAiAvailable] = useState(null) // null = unknown yet
   const [loading, setLoading] = useState(false)
@@ -58,7 +56,7 @@ export function Home({ user }) {
   async function produce(text, avoid) {
     if (mode === 'ai') {
       try {
-        const ai = await generateAffirmationAI(text, avoid)
+        const ai = await generateAffirmationAI(text, avoid, lang)
         setAiAvailable(true)
         return ai
       } catch (err) {
@@ -68,13 +66,11 @@ export function Home({ user }) {
         }
         if (err.status === 503) {
           setAiAvailable(false)
-          setNotice(
-            'No API key found — add one to enable AI affirmations. Here’s one from the local engine for now.',
-          )
+          setNotice(t('noticeNoKey'))
         } else if (err.reason === 'refusal') {
-          setNotice('Let’s hold this one gently — here’s a grounding affirmation instead.')
+          setNotice(t('noticeRefusal'))
         } else {
-          setNotice('Couldn’t reach the AI just now — here’s one from the local engine.')
+          setNotice(t('noticeUnreachable'))
         }
         return { ...generateAffirmation(text, avoid), source: 'local' }
       }
@@ -146,21 +142,23 @@ export function Home({ user }) {
     let contents, type, ext
     if (format === 'txt') {
       const lines = [
-        'Guidance — journal export',
-        `Exported ${new Date().toLocaleString()}`,
-        `${journal.length} ${journal.length === 1 ? 'entry' : 'entries'}`,
+        t('exportTitle'),
+        t('exportExported', { date: new Date().toLocaleString(lang) }),
+        journal.length === 1
+          ? t('exportEntry', { n: journal.length })
+          : t('exportEntries', { n: journal.length }),
       ]
       journal.forEach((r) => {
         lines.push(
           '',
           '─'.repeat(32),
-          new Date(r.ts).toLocaleString() + (r.themeLabel ? ` · ${r.themeLabel}` : ''),
+          new Date(r.ts).toLocaleString(lang) + (r.themeLabel ? ` · ${r.themeLabel}` : ''),
           '',
-          'You wrote:',
+          t('exportYouWrote'),
           `  ${r.entry}`,
         )
-        if (r.reflect) lines.push('', 'Reflection:', `  ${r.reflect}`)
-        lines.push('', 'Affirmation:', `  ${r.affirmation}`)
+        if (r.reflect) lines.push('', t('exportReflection'), `  ${r.reflect}`)
+        lines.push('', t('exportAffirmation'), `  ${r.affirmation}`)
       })
       contents = lines.join('\n') + '\n'
       type = 'text/plain'
@@ -222,7 +220,7 @@ export function Home({ user }) {
       await signOut(auth).catch(() => {})
       reset()
     } catch {
-      setNotice('Couldn’t delete your account just now. Please try again.')
+      setNotice(t('noticeDeleteFailed'))
       setDeleting(false)
     }
   }
@@ -241,12 +239,14 @@ export function Home({ user }) {
       </div>
 
       <main className="relative mx-auto flex min-h-full max-w-2xl flex-col px-6 pb-16 pt-12 sm:pt-20">
+        {/* Language — top left */}
+        <LanguageToggle className="absolute left-6 top-6 z-10 sm:top-8" />
         {/* Sign out — top right */}
         <button
           onClick={handleSignOut}
           className="absolute right-6 top-6 z-10 text-sm font-600 text-stone-400 underline-offset-2 transition hover:text-stone-600 hover:underline sm:top-8"
         >
-          Sign out
+          {t('signOut')}
         </button>
 
         {/* Header */}
@@ -262,7 +262,7 @@ export function Home({ user }) {
         </header>
 
         <Composer
-          prompt={prompt}
+          prompt={t('prompts')[promptIndex]}
           entry={entry}
           setEntry={setEntry}
           onSubmit={handleSubmit}
@@ -277,7 +277,7 @@ export function Home({ user }) {
               <SunMark />
             </div>
             <p className="mt-4 font-serif text-lg italic text-stone-500">
-              Composing something just for you…
+              {t('composingForYou')}
             </p>
           </div>
         )}
@@ -302,27 +302,27 @@ export function Home({ user }) {
 
         <footer className="mt-auto pt-16 text-center text-xs text-stone-400">
           {mode === 'ai' && aiAvailable ? (
-            <p>Affirmations are written live 🌅</p>
+            <p>{t('writtenLive')}</p>
           ) : (
-            <p>Everything you write stays on this device. Only for you. 🌅</p>
+            <p>{t('staysOnDevice')}</p>
           )}
           <button
             onClick={handleSignOut}
             className="mt-3 text-stone-400 underline-offset-2 transition hover:text-stone-600 hover:underline"
           >
-            Sign out
+            {t('signOut')}
           </button>
           <p className="mt-4 text-stone-400">
-            <a href="/privacy" className="underline-offset-2 transition hover:text-stone-600 hover:underline">Privacy</a>
+            <a href="/privacy" className="underline-offset-2 transition hover:text-stone-600 hover:underline">{t('privacyShort')}</a>
             <span className="px-1.5">·</span>
-            <a href="/terms" className="underline-offset-2 transition hover:text-stone-600 hover:underline">Terms</a>
+            <a href="/terms" className="underline-offset-2 transition hover:text-stone-600 hover:underline">{t('terms')}</a>
             <span className="px-1.5">·</span>
             <button
               onClick={handleDeleteAccount}
               disabled={deleting}
               className="underline-offset-2 transition hover:text-rose-500 hover:underline disabled:opacity-50"
             >
-              {deleting ? 'Deleting…' : 'Delete account'}
+              {deleting ? t('deleting') : t('deleteAccount')}
             </button>
           </p>
         </footer>

@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n.jsx'
 import { BreatheHint } from './BreatheHint.jsx'
 import { SourceBadge } from './SourceBadge.jsx'
 
@@ -5,6 +6,7 @@ import { SourceBadge } from './SourceBadge.jsx'
 // `sectionRef` is forwarded so the parent can scroll it into view; the parent
 // also keys this on the affirmation text so a new one replays the entrance.
 export function AffirmationResult({ result, loading, onAnother, onReset, sectionRef }) {
+  const { t } = useI18n()
   return (
     <section
       ref={sectionRef}
@@ -30,13 +32,13 @@ export function AffirmationResult({ result, loading, onAnother, onReset, section
             disabled={loading}
             className="rounded-full bg-stone-800/90 px-5 py-2 text-sm font-600 text-amber-50 transition hover:bg-stone-800 active:scale-[0.98] disabled:opacity-50"
           >
-            Say it another way
+            {t('sayAnother')}
           </button>
           <button
             onClick={onReset}
             className="rounded-full px-5 py-2 text-sm font-600 text-stone-500 transition hover:bg-white/60 hover:text-stone-700"
           >
-            Start fresh
+            {t('startFresh')}
           </button>
         </div>
       </div>

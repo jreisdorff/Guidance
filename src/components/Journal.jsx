@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { formatTime } from '../format.js'
 import { groupByDate, groupRephrasings, recentThemes } from '../journal-utils.js'
 import { ConfirmDialog } from './ConfirmDialog.jsx'
 import { ExportMenu } from './ExportMenu.jsx'
+import { JournalCard } from './JournalCard.jsx'
 
 // The collapsible journal: recent-theme chips, search, and the day-grouped list
 // of entries (with re-phrasings of one moment collapsed into a single card).
@@ -18,7 +18,7 @@ export function Journal({ journal, onDelete, onClear, onExport }) {
   function runConfirm() {
     if (!confirm) return
     if (confirm.type === 'clear') onClear()
-    else if (confirm.type === 'entry') onDelete(confirm.id)
+    else if (confirm.type === 'entry') confirm.ids.forEach(onDelete)
     setConfirm(null)
   }
 
@@ -107,43 +107,11 @@ export function Journal({ journal, onDelete, onClear, onExport }) {
                 {group.label}
               </h3>
               {groupRephrasings(group.items).map((g) => (
-                <article
+                <JournalCard
                   key={g.gid}
-                  className="group rounded-2xl bg-white/60 p-5 ring-1 ring-white/60 backdrop-blur"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <time className="text-xs uppercase tracking-wider text-stone-400">
-                      {formatTime(g.items[0].ts)}
-                    </time>
-                    {g.items.length > 1 && (
-                      <span className="text-xs text-stone-300">
-                        {g.items.length} ways
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-2 text-sm italic text-stone-500">“{g.entry}”</p>
-                  <div className="mt-3 space-y-3">
-                    {g.items.map((r, i) => (
-                      <div
-                        key={r.id}
-                        className={`flex items-start justify-between gap-3 ${
-                          i > 0 ? 'border-t border-stone-200/60 pt-3' : ''
-                        }`}
-                      >
-                        <p className="font-serif text-lg leading-relaxed text-stone-700">
-                          {r.affirmation}
-                        </p>
-                        <button
-                          onClick={() => setConfirm({ type: 'entry', id: r.id })}
-                          className="shrink-0 text-xs text-stone-400 transition hover:text-rose-500"
-                          aria-label="Remove this entry"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </article>
+                  group={g}
+                  onRequestRemove={(ids) => setConfirm({ type: 'entry', ids })}
+                />
               ))}
             </div>
           ))}
@@ -156,7 +124,9 @@ export function Journal({ journal, onDelete, onClear, onExport }) {
         message={
           confirm?.type === 'clear'
             ? 'Are you sure you want to remove your journal entries? This can’t be undone. If you’d like to keep them, cancel and Export first.'
-            : 'Are you sure you want to remove this entry? This can’t be undone.'
+            : confirm?.ids?.length > 1
+              ? `Are you sure you want to remove this entry and its ${confirm.ids.length} affirmations? This can’t be undone.`
+              : 'Are you sure you want to remove this entry? This can’t be undone.'
         }
         confirmLabel={confirm?.type === 'clear' ? 'Clear all' : 'Remove'}
         onConfirm={runConfirm}

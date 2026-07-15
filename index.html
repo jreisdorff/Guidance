@@ -124,10 +124,12 @@
     </script>
 
     <style>
-      /* Styling for the static fallback content below (shown briefly before the
-         app loads, and to crawlers / no-JS visitors). */
-      body { margin: 0; background: linear-gradient(135deg, #fffbeb, #fff1f2 52%, #ffedd5); }
+      /* The static fallback below is for crawlers / no-JS visitors and lives in
+         the HTML source. It's hidden from JS visitors so it never flashes before
+         the React app mounts; a <noscript> rule re-shows it when JS is off. */
+      body { margin: 0; background: linear-gradient(180deg, #fffbeb, #fff1f2 50%, #ffedd5); }
       .gd-fallback {
+        display: none;
         max-width: 760px;
         margin: 0 auto;
         padding: 64px 24px 96px;
@@ -167,6 +169,11 @@
         color: #78716c;
       }
     </style>
+    <noscript>
+      <style>
+        .gd-fallback { display: block; }
+      </style>
+    </noscript>
   </head>
   <body>
     <div id="root">

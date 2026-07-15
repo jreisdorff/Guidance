@@ -11,8 +11,9 @@ import { JournalCard } from './JournalCard.jsx'
 export function Journal({ journal, onDelete, onClear, onExport }) {
   const [showJournal, setShowJournal] = useState(false)
   const [journalQuery, setJournalQuery] = useState('')
+  const [activeThemes, setActiveThemes] = useState([])
   // Pending destructive action awaiting confirmation:
-  //   null | { type: 'clear' } | { type: 'entry', id }
+  //   null | { type: 'clear' } | { type: 'entry', ids }
   const [confirm, setConfirm] = useState(null)
 
   function runConfirm() {
@@ -22,15 +23,24 @@ export function Journal({ journal, onDelete, onClear, onExport }) {
     setConfirm(null)
   }
 
-  const journalQ = journalQuery.trim().toLowerCase()
-  const filteredJournal = journalQ
-    ? journal.filter(
-        (r) =>
-          (r.entry || '').toLowerCase().includes(journalQ) ||
-          (r.affirmation || '').toLowerCase().includes(journalQ),
-      )
-    : journal
+  function toggleTheme(theme) {
+    setActiveThemes((cur) =>
+      cur.includes(theme) ? cur.filter((t) => t !== theme) : [...cur, theme],
+    )
+  }
+
   const themes = recentThemes(journal)
+  const journalQ = journalQuery.trim().toLowerCase()
+  const filtering = journalQ !== '' || activeThemes.length > 0
+  const filteredJournal = journal.filter((r) => {
+    const matchesText =
+      !journalQ ||
+      (r.entry || '').toLowerCase().includes(journalQ) ||
+      (r.affirmation || '').toLowerCase().includes(journalQ)
+    const matchesTheme =
+      activeThemes.length === 0 || activeThemes.includes(r.themeLabel)
+    return matchesText && matchesTheme
+  })
 
   return (
     <section className="mt-14">
@@ -70,20 +80,39 @@ export function Journal({ journal, onDelete, onClear, onExport }) {
               for you to return to.
             </p>
           )}
-          {themes.length > 0 && !journalQ && (
+          {themes.length > 0 && (
             <div className="rounded-2xl bg-white/40 px-5 py-4">
-              <p className="text-xs uppercase tracking-widest text-stone-400">
-                Lately, you’ve been feeling
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {themes.map((t) => (
-                  <span
-                    key={t}
-                    className="rounded-full bg-white/70 px-3 py-1 text-sm text-stone-600 ring-1 ring-white/60"
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs uppercase tracking-widest text-stone-400">
+                  Lately, you’ve been feeling
+                </p>
+                {activeThemes.length > 0 && (
+                  <button
+                    onClick={() => setActiveThemes([])}
+                    className="text-xs text-stone-400 transition hover:text-stone-600"
                   >
-                    {t}
-                  </span>
-                ))}
+                    Clear filters
+                  </button>
+                )}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {themes.map((t) => {
+                  const active = activeThemes.includes(t)
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => toggleTheme(t)}
+                      aria-pressed={active}
+                      className={`rounded-full px-3 py-1 text-sm ring-1 transition ${
+                        active
+                          ? 'bg-stone-800 text-amber-50 ring-stone-800'
+                          : 'bg-white/70 text-stone-600 ring-white/60 hover:ring-stone-300'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -96,9 +125,9 @@ export function Journal({ journal, onDelete, onClear, onExport }) {
               className="w-full rounded-2xl bg-white/60 px-4 py-2.5 text-sm text-stone-700 ring-1 ring-white/60 placeholder:text-stone-400 focus:outline-none"
             />
           )}
-          {journalQ && filteredJournal.length === 0 && (
+          {filtering && filteredJournal.length === 0 && (
             <p className="rounded-2xl bg-white/50 px-5 py-6 text-center text-sm text-stone-400">
-              No entries match “{journalQuery.trim()}”.
+              No entries match your filters.
             </p>
           )}
           {groupByDate(filteredJournal).map((group) => (

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { formatTime } from '../format.js'
 import { groupByDate, groupRephrasings, recentThemes } from '../journal-utils.js'
+import { ConfirmDialog } from './ConfirmDialog.jsx'
 import { ExportMenu } from './ExportMenu.jsx'
 
 // The collapsible journal: recent-theme chips, search, and the day-grouped list
@@ -10,6 +11,16 @@ import { ExportMenu } from './ExportMenu.jsx'
 export function Journal({ journal, onDelete, onClear, onExport }) {
   const [showJournal, setShowJournal] = useState(false)
   const [journalQuery, setJournalQuery] = useState('')
+  // Pending destructive action awaiting confirmation:
+  //   null | { type: 'clear' } | { type: 'entry', id }
+  const [confirm, setConfirm] = useState(null)
+
+  function runConfirm() {
+    if (!confirm) return
+    if (confirm.type === 'clear') onClear()
+    else if (confirm.type === 'entry') onDelete(confirm.id)
+    setConfirm(null)
+  }
 
   const journalQ = journalQuery.trim().toLowerCase()
   const filteredJournal = journalQ
@@ -42,7 +53,7 @@ export function Journal({ journal, onDelete, onClear, onExport }) {
           <div className="flex items-center gap-4">
             <ExportMenu onExport={onExport} />
             <button
-              onClick={onClear}
+              onClick={() => setConfirm({ type: 'clear' })}
               className="text-xs text-stone-400 transition hover:text-rose-500"
             >
               Clear all
@@ -123,9 +134,9 @@ export function Journal({ journal, onDelete, onClear, onExport }) {
                           {r.affirmation}
                         </p>
                         <button
-                          onClick={() => onDelete(r.id)}
-                          className="shrink-0 text-xs text-stone-300 opacity-0 transition hover:text-rose-400 group-hover:opacity-100"
-                          aria-label="Delete affirmation"
+                          onClick={() => setConfirm({ type: 'entry', id: r.id })}
+                          className="shrink-0 text-xs text-stone-400 transition hover:text-rose-500"
+                          aria-label="Remove this entry"
                         >
                           Remove
                         </button>
@@ -138,6 +149,19 @@ export function Journal({ journal, onDelete, onClear, onExport }) {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirm}
+        title={confirm?.type === 'clear' ? 'Clear your journal?' : 'Remove this entry?'}
+        message={
+          confirm?.type === 'clear'
+            ? 'Are you sure you want to remove your journal entries? This can’t be undone. If you’d like to keep them, cancel and Export first.'
+            : 'Are you sure you want to remove this entry? This can’t be undone.'
+        }
+        confirmLabel={confirm?.type === 'clear' ? 'Clear all' : 'Remove'}
+        onConfirm={runConfirm}
+        onCancel={() => setConfirm(null)}
+      />
     </section>
   )
 }

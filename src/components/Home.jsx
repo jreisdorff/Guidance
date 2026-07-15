@@ -130,11 +130,10 @@ export function Home({ user }) {
     if (user) removeEntry(user.uid, id).catch(() => {})
   }
 
+  // Confirmation is handled by the Journal's dialog before this is called.
   function clearJournal() {
     if (!user) return
-    if (window.confirm('Clear your whole journal? This cannot be undone.')) {
-      journal.forEach((r) => removeEntry(user.uid, r.id).catch(() => {}))
-    }
+    journal.forEach((r) => removeEntry(user.uid, r.id).catch(() => {}))
   }
 
   // Download the signed-in user's full journal as a portable file. Runs entirely

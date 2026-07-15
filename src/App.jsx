@@ -59,6 +59,20 @@ function groupByDate(entries) {
   return groups
 }
 
+// Within a day's entries (already newest-first), collapse consecutive
+// re-phrasings of one moment — entries that share a groupId — into a single
+// card. Legacy entries without a groupId each stand on their own.
+function groupRephrasings(items) {
+  const groups = []
+  for (const item of items) {
+    const gid = item.groupId ?? item.id
+    const last = groups[groups.length - 1]
+    if (last && last.gid === gid) last.items.push(item)
+    else groups.push({ gid, entry: item.entry, items: [item] })
+  }
+  return groups
+}
+
 export default function App() {
   const [entry, setEntry] = useState('')
   const [result, setResult] = useState(null)
@@ -135,7 +149,10 @@ export default function App() {
     setNotice(null)
     const generated = await produce(text, result?.affirmation)
     if (!generated) return setLoading(false) // signed out; gate will take over
-    const record = { ts: Date.now(), entry: text, ...generated }
+    // groupId anchors this moment; re-phrasings (handleAnother) reuse it so the
+    // journal can group them under one card.
+    const ts = Date.now()
+    const record = { ts, groupId: ts, entry: text, ...generated }
     setResult(record)
     // Persist to the user's Firestore journal; the subscription refreshes the list.
     if (user) addEntry(user.uid, record).catch(() => {})
@@ -148,7 +165,16 @@ export default function App() {
     setNotice(null)
     const generated = await produce(result.entry, result.affirmation)
     if (!generated) return setLoading(false)
-    setResult((prev) => ({ ...prev, ...generated }))
+    // Each re-phrasing is logged as its own entry, but shares the original
+    // moment's groupId so the journal can group them under one card.
+    const record = {
+      ts: Date.now(),
+      groupId: result.groupId ?? result.ts,
+      entry: result.entry,
+      ...generated,
+    }
+    setResult(record)
+    if (user) addEntry(user.uid, record).catch(() => {})
     setLoading(false)
   }
 
@@ -167,6 +193,76 @@ export default function App() {
     if (window.confirm('Clear your whole journal? This cannot be undone.')) {
       journal.forEach((r) => removeEntry(user.uid, r.id).catch(() => {}))
     }
+  }
+
+  // Download the signed-in user's full journal as a portable file. Runs entirely
+  // in the browser — the data is already loaded, so nothing is sent anywhere; the
+  // user just saves a copy of what's theirs. Supports a machine-readable JSON
+  // export and a human-readable plain-text one.
+  function exportJournal(format = 'json') {
+    if (!user || !journal.length) return
+
+    let contents, type, ext
+    if (format === 'txt') {
+      const lines = [
+        'Guidance — journal export',
+        `Exported ${new Date().toLocaleString()}`,
+        `${journal.length} ${journal.length === 1 ? 'entry' : 'entries'}`,
+      ]
+      journal.forEach((r) => {
+        lines.push(
+          '',
+          '─'.repeat(32),
+          new Date(r.ts).toLocaleString() + (r.themeLabel ? ` · ${r.themeLabel}` : ''),
+          '',
+          'You wrote:',
+          `  ${r.entry}`,
+        )
+        if (r.reflect) lines.push('', 'Reflection:', `  ${r.reflect}`)
+        lines.push('', 'Affirmation:', `  ${r.affirmation}`)
+      })
+      contents = lines.join('\n') + '\n'
+      type = 'text/plain'
+      ext = 'txt'
+    } else {
+      contents = JSON.stringify(
+        {
+          app: 'Guidance',
+          exportedAt: new Date().toISOString(),
+          account: {
+            uid: user.uid,
+            email: user.email ?? null,
+            name: user.displayName ?? null,
+            phone: user.phoneNumber ?? null,
+          },
+          entryCount: journal.length,
+          entries: journal.map((r) => ({
+            id: r.id,
+            date: new Date(r.ts).toISOString(),
+            ts: r.ts,
+            theme: r.themeLabel ?? null,
+            entry: r.entry,
+            reflection: r.reflect ?? null,
+            affirmation: r.affirmation,
+            source: r.source ?? null,
+          })),
+        },
+        null,
+        2,
+      )
+      type = 'application/json'
+      ext = 'json'
+    }
+
+    const blob = new Blob([contents], { type })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `guidance-journal-${new Date().toISOString().slice(0, 10)}.${ext}`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
   }
 
   if (user === undefined) {
@@ -323,12 +419,15 @@ export default function App() {
               )}
             </button>
             {showJournal && journal.length > 0 && (
-              <button
-                onClick={clearJournal}
-                className="text-xs text-stone-400 transition hover:text-rose-500"
-              >
-                Clear all
-              </button>
+              <div className="flex items-center gap-4">
+                <ExportMenu onExport={exportJournal} />
+                <button
+                  onClick={clearJournal}
+                  className="text-xs text-stone-400 transition hover:text-rose-500"
+                >
+                  Clear all
+                </button>
+              </div>
             )}
           </div>
 
@@ -345,27 +444,43 @@ export default function App() {
                   <h3 className="px-1 text-xs font-600 uppercase tracking-widest text-stone-400">
                     {group.label}
                   </h3>
-                  {group.items.map((r) => (
+                  {groupRephrasings(group.items).map((g) => (
                     <article
-                      key={r.id}
+                      key={g.gid}
                       className="group rounded-2xl bg-white/60 p-5 ring-1 ring-white/60 backdrop-blur"
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center justify-between gap-3">
                         <time className="text-xs uppercase tracking-wider text-stone-400">
-                          {formatTime(r.ts)}
+                          {formatTime(g.items[0].ts)}
                         </time>
-                        <button
-                          onClick={() => deleteEntry(r.id)}
-                          className="text-xs text-stone-300 opacity-0 transition hover:text-rose-400 group-hover:opacity-100"
-                          aria-label="Delete entry"
-                        >
-                          Remove
-                        </button>
+                        {g.items.length > 1 && (
+                          <span className="text-xs text-stone-300">
+                            {g.items.length} ways
+                          </span>
+                        )}
                       </div>
-                      <p className="mt-2 text-sm italic text-stone-500">“{r.entry}”</p>
-                      <p className="mt-3 font-serif text-lg leading-relaxed text-stone-700">
-                        {r.affirmation}
-                      </p>
+                      <p className="mt-2 text-sm italic text-stone-500">“{g.entry}”</p>
+                      <div className="mt-3 space-y-3">
+                        {g.items.map((r, i) => (
+                          <div
+                            key={r.id}
+                            className={`flex items-start justify-between gap-3 ${
+                              i > 0 ? 'border-t border-stone-200/60 pt-3' : ''
+                            }`}
+                          >
+                            <p className="font-serif text-lg leading-relaxed text-stone-700">
+                              {r.affirmation}
+                            </p>
+                            <button
+                              onClick={() => deleteEntry(r.id)}
+                              className="shrink-0 text-xs text-stone-300 opacity-0 transition hover:text-rose-400 group-hover:opacity-100"
+                              aria-label="Delete affirmation"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </article>
                   ))}
                 </div>
@@ -496,6 +611,55 @@ function CountryDropdown({ value, onChange }) {
               <span className="text-stone-700">{c.name}</span>
             </button>
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// A small "Export ▾" menu letting the user download their journal as either a
+// human-readable .txt or a machine-readable .json. Mirrors CountryDropdown's
+// open-state + outside-click pattern.
+function ExportMenu({ onExport }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onDocClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [open])
+
+  function choose(format) {
+    onExport(format)
+    setOpen(false)
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="text-xs text-stone-400 transition hover:text-stone-600"
+      >
+        Export ▾
+      </button>
+      {open && (
+        <div className="absolute right-0 z-20 mt-1 w-36 rounded-2xl bg-white p-1 text-left shadow-xl ring-1 ring-stone-200">
+          <button
+            onClick={() => choose('txt')}
+            className="block w-full rounded-xl px-3 py-2 text-left text-sm text-stone-700 transition hover:bg-stone-100"
+          >
+            Text (.txt)
+          </button>
+          <button
+            onClick={() => choose('json')}
+            className="block w-full rounded-xl px-3 py-2 text-left text-sm text-stone-700 transition hover:bg-stone-100"
+          >
+            JSON (.json)
+          </button>
         </div>
       )}
     </div>

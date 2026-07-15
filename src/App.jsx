@@ -744,6 +744,11 @@ function SignIn() {
           A space for self-reflection, not a substitute for professional care. In
           crisis? Call or text 988 (US).
         </p>
+        <p className="mx-auto mt-3 max-w-xs text-balance text-xs leading-relaxed text-stone-400">
+          By continuing you agree to our{' '}
+          <a href="/terms" className="underline hover:text-stone-500">Terms</a> and{' '}
+          <a href="/privacy" className="underline hover:text-stone-500">Privacy Policy</a>.
+        </p>
         <div ref={recaptchaRef} />
       </div>
     </Backdrop>

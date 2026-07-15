@@ -389,6 +389,11 @@ export default function App() {
           >
             Sign out
           </button>
+          <p className="mt-4 text-stone-400">
+            <a href="/privacy" className="underline-offset-2 transition hover:text-stone-600 hover:underline">Privacy</a>
+            <span className="px-1.5">·</span>
+            <a href="/terms" className="underline-offset-2 transition hover:text-stone-600 hover:underline">Terms</a>
+          </p>
         </footer>
       </main>
     </div>

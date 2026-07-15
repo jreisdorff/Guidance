@@ -8,7 +8,13 @@
 import 'dotenv/config'
 import express from 'express'
 import { aiAvailable, composeAffirmation, STATUS_FOR_CODE } from '../lib/claude.js'
-import { isRequestAuthed } from '../lib/firebaseAdmin.js'
+import {
+  bearerToken,
+  deleteUserAccount,
+  isRequestAuthed,
+  verifyFirebaseToken,
+  STATUS_FOR_CODE as AUTH_STATUS,
+} from '../lib/firebaseAdmin.js'
 
 const PORT = process.env.PORT || 8787
 
@@ -31,6 +37,25 @@ app.post('/api/affirm', async (req, res) => {
     res
       .status(STATUS_FOR_CODE[err.code] || 502)
       .json({ error: err.code || 'generation_failed' })
+  }
+})
+
+app.post('/api/delete-account', async (req, res) => {
+  let decoded
+  try {
+    decoded = await verifyFirebaseToken(bearerToken(req))
+  } catch (err) {
+    return res
+      .status(AUTH_STATUS[err.code] || 401)
+      .json({ error: err.code || 'unauthorized' })
+  }
+  try {
+    await deleteUserAccount(decoded.uid)
+    res.json({ ok: true })
+  } catch (err) {
+    res
+      .status(AUTH_STATUS[err.code] || 500)
+      .json({ error: err.code || 'delete_failed' })
   }
 })
 

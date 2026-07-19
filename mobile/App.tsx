@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, StyleSheet, View } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { useFonts } from 'expo-font'
@@ -13,24 +14,47 @@ import {
   NunitoSans_700Bold,
 } from '@expo-google-fonts/nunito-sans'
 import Background from './src/components/Background'
+import AnimatedSplash from './src/components/AnimatedSplash'
 import { AuthProvider, useAuth } from './src/auth/AuthContext'
+import { SubscriptionProvider } from './src/subscription'
 import { I18nProvider } from './src/i18n'
 import LoginScreen from './src/screens/LoginScreen'
 import HomeScreen from './src/screens/HomeScreen'
 import { colors } from './src/theme'
 
-function Root() {
-  const { loading, user } = useAuth()
+function Loader() {
+  return (
+    <View style={styles.center}>
+      <ActivityIndicator color={colors.rose500} size="large" />
+    </View>
+  )
+}
 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.rose500} size="large" />
-      </View>
-    )
+function Root() {
+  const { loading, user, signInAsGuest, signOut } = useAuth()
+  const [wantsSignIn, setWantsSignIn] = useState(false)
+  const triedGuest = useRef(false)
+
+  // Fresh visitors skip the login screen and go straight to the prompt: sign
+  // them in as a guest. Only show the login screen when it's explicitly asked
+  // for, or as a fallback if anonymous sign-in isn't available.
+  useEffect(() => {
+    if (loading || user || wantsSignIn || triedGuest.current) return
+    triedGuest.current = true
+    signInAsGuest().catch(() => setWantsSignIn(true))
+  }, [loading, user, wantsSignIn, signInAsGuest])
+
+  // Take the user to the login screen: remember the intent so auto-guest doesn't
+  // pull them back in, then sign the current (guest) user out.
+  async function requestSignIn() {
+    triedGuest.current = true
+    setWantsSignIn(true)
+    await signOut().catch(() => {})
   }
 
-  return user ? <HomeScreen /> : <LoginScreen />
+  if (loading) return <Loader />
+  if (user) return <HomeScreen onRequestSignIn={requestSignIn} />
+  return wantsSignIn ? <LoginScreen /> : <Loader />
 }
 
 export default function App() {
@@ -43,20 +67,22 @@ export default function App() {
     NunitoSans_600SemiBold,
     NunitoSans_700Bold,
   })
+  const [splashDone, setSplashDone] = useState(false)
 
   return (
     <Background>
       <StatusBar style="dark" />
-      {fontsLoaded ? (
+      {fontsLoaded && (
         <I18nProvider>
           <AuthProvider>
-            <Root />
+            <SubscriptionProvider>
+              <Root />
+            </SubscriptionProvider>
           </AuthProvider>
         </I18nProvider>
-      ) : (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.rose500} size="large" />
-        </View>
+      )}
+      {!splashDone && (
+        <AnimatedSplash ready={fontsLoaded} onDone={() => setSplashDone(true)} />
       )}
     </Background>
   )

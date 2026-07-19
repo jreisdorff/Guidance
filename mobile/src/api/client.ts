@@ -27,6 +27,9 @@ async function post<T>(path: string, body: unknown, token?: string): Promise<T> 
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      // Marks this as the mobile app so the backend applies the subscription /
+      // free-question quota (the web app is unlimited).
+      'X-Guidance-Client': 'mobile',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(body),

@@ -78,6 +78,22 @@ const dict: Record<Lang, Dict> = {
     guestLimitMsg: 'Sign in or create a free account to keep asking — it only takes a moment.',
     guestSignIn: 'Sign in to continue',
 
+    // Subscription / paywall (1 free question, then a 7-day trial, then $0.99/mo)
+    freeQuestionNote: 'Your first question is free.',
+    paywallTitle: 'Keep going with Guidance',
+    paywallBody:
+      'You’ve used your free question. Start a 7-day free trial to keep receiving guidance whenever you need it.',
+    paywallCta: 'Start 7-day free trial',
+    paywallPriceNote: 'Then {price}/month. Cancel anytime.',
+    paywallPriceFallback: '$0.99',
+    paywallRestore: 'Restore purchase',
+    paywallTerms:
+      'Your free trial lasts 7 days. After that, your subscription renews monthly at {price} until cancelled. Manage or cancel anytime in Settings.',
+    paywallError: 'Couldn’t complete that just now. Please try again.',
+    paywallThanks: 'You’re all set — thank you for supporting Guidance. 🌅',
+    restoring: 'Restoring…',
+    subscribing: 'Starting…',
+
     // Result
     sayAnother: 'Say it another way',
     startFresh: 'Start fresh',
@@ -195,6 +211,22 @@ const dict: Record<Lang, Dict> = {
     guestLimitTitle: 'Ya usaste tus 3 preguntas gratis',
     guestLimitMsg: 'Inicia sesión o crea una cuenta gratis para seguir preguntando — solo toma un momento.',
     guestSignIn: 'Inicia sesión para continuar',
+
+    // Subscription / paywall (1 pregunta gratis, luego prueba de 7 días, luego $0.99/mes)
+    freeQuestionNote: 'Tu primera pregunta es gratis.',
+    paywallTitle: 'Sigue con Guidance',
+    paywallBody:
+      'Ya usaste tu pregunta gratis. Comienza una prueba gratuita de 7 días para seguir recibiendo guía cuando la necesites.',
+    paywallCta: 'Comenzar prueba de 7 días',
+    paywallPriceNote: 'Luego {price}/mes. Cancela cuando quieras.',
+    paywallPriceFallback: '$0.99',
+    paywallRestore: 'Restaurar compra',
+    paywallTerms:
+      'Tu prueba gratuita dura 7 días. Después, tu suscripción se renueva cada mes por {price} hasta que la canceles. Administra o cancela cuando quieras en Ajustes.',
+    paywallError: 'No se pudo completar en este momento. Inténtalo de nuevo.',
+    paywallThanks: 'Todo listo — gracias por apoyar a Guidance. 🌅',
+    restoring: 'Restaurando…',
+    subscribing: 'Comenzando…',
 
     // Result
     sayAnother: 'Dilo de otra manera',

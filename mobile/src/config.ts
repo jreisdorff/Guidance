@@ -22,3 +22,9 @@ export const GOOGLE_IOS_CLIENT_ID =
 export const SITE_URL = process.env.EXPO_PUBLIC_SITE_URL ?? 'https://guidances.net'
 export const PRIVACY_URL = `${SITE_URL}/privacy`
 export const TERMS_URL = `${SITE_URL}/terms`
+
+// The App Store auto-renewable subscription product id. Create this in App
+// Store Connect ($0.99/month) with a 7-day free-trial introductory offer, and
+// keep this id in sync with the product id there.
+export const SUBSCRIPTION_SKU =
+  process.env.EXPO_PUBLIC_SUBSCRIPTION_SKU ?? 'com.jreisdorff.guidance.monthly'

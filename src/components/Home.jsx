@@ -18,7 +18,7 @@ const MODE_KEY = 'divinity.mode.v1'
 
 // The signed-in experience: compose an affirmation, keep a journal. `user` is
 // guaranteed present here — App handles the auth gate.
-export function Home({ user }) {
+export function Home({ user, onRequestSignIn }) {
   const { t, lang } = useI18n()
   const [entry, setEntry] = useState('')
   const [result, setResult] = useState(null)
@@ -234,9 +234,12 @@ export function Home({ user }) {
     }
   }
 
+  // Both a guest's "Sign in" and a signed-in user's "Sign out" lead to the
+  // login page (App signs the current user out and remembers the intent, so
+  // auto-guest doesn't just pull them back in).
   async function handleSignOut() {
-    await signOut(auth)
     reset()
+    await onRequestSignIn()
   }
 
   return (

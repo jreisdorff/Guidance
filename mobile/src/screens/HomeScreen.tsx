@@ -16,7 +16,9 @@ import GradientButton from '../components/GradientButton'
 import LanguageToggle from '../components/LanguageToggle'
 import Journal from '../components/Journal'
 import ConfirmModal from '../components/ConfirmModal'
+import Paywall from '../components/Paywall'
 import { useAuth } from '../auth/AuthContext'
+import { useSubscription } from '../subscription'
 import { getGuidance, type Guidance, ApiError } from '../api/client'
 import { deleteAccount } from '../api/account'
 import { addEntry, removeEntry, subscribeEntries, type JournalItem } from '../journal'
@@ -26,7 +28,7 @@ import { colors, fonts } from '../theme'
 
 type ResultItem = Guidance & { entry: string; ts: number; groupId: number }
 
-export default function HomeScreen() {
+export default function HomeScreen({ onRequestSignIn }: { onRequestSignIn: () => void }) {
   const { user, getToken, signOut } = useAuth()
   const { t, lang, list } = useI18n()
   const scrollRef = useRef<ScrollView>(null)
@@ -47,14 +49,15 @@ export default function HomeScreen() {
   const prompts = list('prompts')
   const prompt = prompts[promptIndex] ?? prompts[0] ?? ''
 
-  // Guest trial: anonymous users may ask a fixed number of questions before
-  // they have to sign in. A "question" is one moment (one groupId); saying it
-  // another way reuses the moment, so it doesn't count against the limit.
-  const GUEST_LIMIT = 3
+  // Access model: the first question is free, then a 7-day free trial that
+  // renews at $0.99/month. The backend is the source of truth and returns 402
+  // once the free question is spent; the client mirrors that (usedFree /
+  // mustSubscribe) so the paywall appears promptly. Subscribers are unlimited.
+  const { subscribed } = useSubscription()
+  const [usedFree, setUsedFree] = useState(false)
+  const [mustSubscribe, setMustSubscribe] = useState(false)
   const isGuest = user?.isAnonymous ?? false
-  const questionsAsked = new Set(journal.map((e) => e.groupId ?? e.id)).size
-  const guestRemaining = Math.max(0, GUEST_LIMIT - questionsAsked)
-  const guestLocked = isGuest && guestRemaining <= 0
+  const locked = !subscribed && (mustSubscribe || usedFree)
 
   // Live-subscribe to this user's journal in Firestore.
   useEffect(() => {
@@ -74,7 +77,7 @@ export default function HomeScreen() {
   }
 
   async function onSubmit() {
-    if (!entry.trim() || loading || guestLocked) return
+    if (!entry.trim() || loading || locked) return
     setLoading(true)
     setNotice(null)
     try {
@@ -88,8 +91,12 @@ export default function HomeScreen() {
       setResult(record)
       // Persist to Firestore; the subscription refreshes the journal list.
       if (user) addEntry(user.uid, record).catch(() => {})
+      // A non-subscriber just spent their free question — next one hits the paywall.
+      if (!subscribed) setUsedFree(true)
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) return void signOut()
+      // 402 = free question used up; show the paywall instead of a notice.
+      if (err instanceof ApiError && err.status === 402) return void setMustSubscribe(true)
       setNotice(noticeFor(err))
     } finally {
       setLoading(false)
@@ -99,7 +106,7 @@ export default function HomeScreen() {
   // Regenerate a fresh affirmation for the same entry, phrased differently.
   // Each re-phrasing is logged as its own entry but shares the moment's groupId.
   async function onAnother() {
-    if (!result || loading) return
+    if (!result || loading || !subscribed) return
     setLoading(true)
     setNotice(null)
     try {
@@ -245,9 +252,9 @@ export default function HomeScreen() {
       >
         {/* Language — top left */}
         <LanguageToggle style={styles.langTop} />
-        {/* Sign out — top right */}
-        <Pressable style={styles.signOutTop} onPress={signOut} hitSlop={8}>
-          <Text style={styles.signOut}>{t('signOut')}</Text>
+        {/* Sign out / Sign in — top right */}
+        <Pressable style={styles.signOutTop} onPress={onRequestSignIn} hitSlop={8}>
+          <Text style={styles.signOut}>{isGuest ? t('signIn') : t('signOut')}</Text>
         </Pressable>
 
         {/* Header */}
@@ -256,25 +263,9 @@ export default function HomeScreen() {
           <Text style={styles.title}>Guidance</Text>
         </View>
 
-        {/* Guest trial banner — kept visible so the 3-question limit is clear */}
-        {isGuest && !guestLocked && (
-          <Pressable style={styles.guestBanner} onPress={signOut} hitSlop={6}>
-            <Text style={styles.guestBannerText}>
-              {guestRemaining === 1
-                ? t('guestBannerLast')
-                : t('guestBanner', { n: guestRemaining })}
-            </Text>
-            <Text style={styles.guestBannerLink}>{t('signIn')}</Text>
-          </Pressable>
-        )}
-
-        {guestLocked ? (
-          /* Trial used up — must sign in to keep asking */
-          <View style={styles.limitCard}>
-            <Text style={styles.limitTitle}>{t('guestLimitTitle')}</Text>
-            <Text style={styles.limitMsg}>{t('guestLimitMsg')}</Text>
-            <GradientButton label={t('guestSignIn')} onPress={signOut} />
-          </View>
+        {locked ? (
+          /* Free question spent — offer the 7-day trial / subscription */
+          <Paywall />
         ) : (
           <>
             {/* Input */}
@@ -323,7 +314,7 @@ export default function HomeScreen() {
               <Text style={styles.affirmation}>{result.affirmation}</Text>
 
               <View style={styles.actionsRow}>
-                {!isGuest && (
+                {subscribed && (
                   <Pressable
                     style={({ pressed }) => [styles.anotherBtn, pressed && styles.pressed]}
                     onPress={onAnother}
@@ -355,7 +346,7 @@ export default function HomeScreen() {
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>{t('writtenLive')}</Text>
-          <Pressable onPress={signOut} hitSlop={8}>
+          <Pressable onPress={onRequestSignIn} hitSlop={8}>
             <Text style={styles.signOut}>{isGuest ? t('signIn') : t('signOut')}</Text>
           </Pressable>
           <View style={styles.footerLinks}>
@@ -448,6 +439,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  freeNote: {
+    fontFamily: fonts.sansSemibold,
+    color: colors.amber700,
+    fontSize: 13,
+    textAlign: 'center',
+  },
   guestBanner: {
     flexDirection: 'row',
     alignItems: 'center',

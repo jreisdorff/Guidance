@@ -36,7 +36,7 @@ export function Landing() {
           <div className="flex items-center gap-5">
             <LanguageToggle />
             <a
-              href="/"
+              href="/?signin"
               className="rounded-full bg-white/70 px-5 py-2 text-sm font-600 text-stone-700 shadow ring-1 ring-white/60 backdrop-blur transition hover:bg-white active:scale-[0.98]"
             >
               {t('logIn')}

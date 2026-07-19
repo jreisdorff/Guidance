@@ -47,6 +47,15 @@ export default function HomeScreen() {
   const prompts = list('prompts')
   const prompt = prompts[promptIndex] ?? prompts[0] ?? ''
 
+  // Guest trial: anonymous users may ask a fixed number of questions before
+  // they have to sign in. A "question" is one moment (one groupId); saying it
+  // another way reuses the moment, so it doesn't count against the limit.
+  const GUEST_LIMIT = 3
+  const isGuest = user?.isAnonymous ?? false
+  const questionsAsked = new Set(journal.map((e) => e.groupId ?? e.id)).size
+  const guestRemaining = Math.max(0, GUEST_LIMIT - questionsAsked)
+  const guestLocked = isGuest && guestRemaining <= 0
+
   // Live-subscribe to this user's journal in Firestore.
   useEffect(() => {
     if (!user) return
@@ -65,7 +74,7 @@ export default function HomeScreen() {
   }
 
   async function onSubmit() {
-    if (!entry.trim() || loading) return
+    if (!entry.trim() || loading || guestLocked) return
     setLoading(true)
     setNotice(null)
     try {
@@ -247,27 +256,50 @@ export default function HomeScreen() {
           <Text style={styles.title}>Guidance</Text>
         </View>
 
-        {/* Input */}
-        <Text style={styles.prompt}>{prompt}</Text>
-        <View style={styles.inputCard}>
-          <TextInput
-            style={styles.input}
-            placeholder={t('entryPlaceholder')}
-            placeholderTextColor={colors.stone400}
-            multiline
-            value={entry}
-            onChangeText={setEntry}
-            editable={!loading}
-          />
-          <View style={styles.inputActions}>
-            <GradientButton
-              label={t('receiveBtn')}
-              onPress={onSubmit}
-              disabled={!entry.trim()}
-              loading={loading}
-            />
+        {/* Guest trial banner — kept visible so the 3-question limit is clear */}
+        {isGuest && !guestLocked && (
+          <Pressable style={styles.guestBanner} onPress={signOut} hitSlop={6}>
+            <Text style={styles.guestBannerText}>
+              {guestRemaining === 1
+                ? t('guestBannerLast')
+                : t('guestBanner', { n: guestRemaining })}
+            </Text>
+            <Text style={styles.guestBannerLink}>{t('signIn')}</Text>
+          </Pressable>
+        )}
+
+        {guestLocked ? (
+          /* Trial used up — must sign in to keep asking */
+          <View style={styles.limitCard}>
+            <Text style={styles.limitTitle}>{t('guestLimitTitle')}</Text>
+            <Text style={styles.limitMsg}>{t('guestLimitMsg')}</Text>
+            <GradientButton label={t('guestSignIn')} onPress={signOut} />
           </View>
-        </View>
+        ) : (
+          <>
+            {/* Input */}
+            <Text style={styles.prompt}>{prompt}</Text>
+            <View style={styles.inputCard}>
+              <TextInput
+                style={styles.input}
+                placeholder={t('entryPlaceholder')}
+                placeholderTextColor={colors.stone400}
+                multiline
+                value={entry}
+                onChangeText={setEntry}
+                editable={!loading}
+              />
+              <View style={styles.inputActions}>
+                <GradientButton
+                  label={t('receiveBtn')}
+                  onPress={onSubmit}
+                  disabled={!entry.trim()}
+                  loading={loading}
+                />
+              </View>
+            </View>
+          </>
+        )}
 
         {notice && <Text style={styles.notice}>{notice}</Text>}
 
@@ -291,13 +323,15 @@ export default function HomeScreen() {
               <Text style={styles.affirmation}>{result.affirmation}</Text>
 
               <View style={styles.actionsRow}>
-                <Pressable
-                  style={({ pressed }) => [styles.anotherBtn, pressed && styles.pressed]}
-                  onPress={onAnother}
-                  disabled={loading}
-                >
-                  <Text style={styles.anotherBtnText}>{t('sayAnother')}</Text>
-                </Pressable>
+                {!isGuest && (
+                  <Pressable
+                    style={({ pressed }) => [styles.anotherBtn, pressed && styles.pressed]}
+                    onPress={onAnother}
+                    disabled={loading}
+                  >
+                    <Text style={styles.anotherBtnText}>{t('sayAnother')}</Text>
+                  </Pressable>
+                )}
                 <Pressable
                   style={({ pressed }) => [styles.freshBtn, pressed && styles.pressed]}
                   onPress={onReset}
@@ -322,7 +356,7 @@ export default function HomeScreen() {
         <View style={styles.footer}>
           <Text style={styles.footerText}>{t('writtenLive')}</Text>
           <Pressable onPress={signOut} hitSlop={8}>
-            <Text style={styles.signOut}>{t('signOut')}</Text>
+            <Text style={styles.signOut}>{isGuest ? t('signIn') : t('signOut')}</Text>
           </Pressable>
           <View style={styles.footerLinks}>
             <Pressable onPress={() => Linking.openURL(PRIVACY_URL)} hitSlop={8}>
@@ -332,12 +366,16 @@ export default function HomeScreen() {
             <Pressable onPress={() => Linking.openURL(TERMS_URL)} hitSlop={8}>
               <Text style={styles.footerLink}>{t('terms')}</Text>
             </Pressable>
-            <Text style={styles.footerDot}>·</Text>
-            <Pressable onPress={() => setConfirmDelete(true)} disabled={deleting} hitSlop={8}>
-              <Text style={[styles.footerLink, styles.deleteLink]}>
-                {deleting ? t('deleting') : t('deleteAccount')}
-              </Text>
-            </Pressable>
+            {!isGuest && (
+              <>
+                <Text style={styles.footerDot}>·</Text>
+                <Pressable onPress={() => setConfirmDelete(true)} disabled={deleting} hitSlop={8}>
+                  <Text style={[styles.footerLink, styles.deleteLink]}>
+                    {deleting ? t('deleting') : t('deleteAccount')}
+                  </Text>
+                </Pressable>
+              </>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -408,6 +446,49 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',
+  },
+
+  guestBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    alignSelf: 'center',
+    backgroundColor: colors.cardSoft,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.ring,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  guestBannerText: { fontFamily: fonts.sansSemibold, color: colors.amber700, fontSize: 13 },
+  guestBannerLink: {
+    fontFamily: fonts.sansBold,
+    color: colors.stone700,
+    fontSize: 13,
+    textDecorationLine: 'underline',
+  },
+
+  limitCard: {
+    ...cardBase,
+    backgroundColor: colors.cardStrong,
+    padding: 28,
+    alignItems: 'center',
+    gap: 12,
+  },
+  limitTitle: {
+    fontFamily: fonts.serif,
+    fontSize: 22,
+    color: colors.stone800,
+    textAlign: 'center',
+  },
+  limitMsg: {
+    fontFamily: fonts.sans,
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.stone500,
+    textAlign: 'center',
+    marginBottom: 4,
   },
 
   loadingCard: {

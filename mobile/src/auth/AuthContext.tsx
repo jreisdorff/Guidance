@@ -15,6 +15,7 @@ import {
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
+  signInAnonymously as firebaseSignInAnonymously,
   signInWithCredential,
   signInWithPhoneNumber,
   signOut as firebaseSignOut,
@@ -33,6 +34,9 @@ type AuthState = {
   signingIn: boolean
   signInWithGoogle: () => Promise<void>
   signInWithPhone: (phoneNumber: string) => Promise<Confirmation>
+  // Guest mode: a real (anonymous) Firebase user, so the backend still gets a
+  // valid token. Lets people try a few questions before signing in for real.
+  signInAsGuest: () => Promise<void>
   signOut: () => Promise<void>
   getToken: () => Promise<string | null>
 }
@@ -70,6 +74,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return signInWithPhoneNumber(firebaseAuth, phoneNumber)
   }
 
+  async function signInAsGuest() {
+    await firebaseSignInAnonymously(firebaseAuth)
+  }
+
   async function signOut() {
     await signOutGoogle()
     await firebaseSignOut(firebaseAuth)
@@ -87,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signingIn,
         signInWithGoogle,
         signInWithPhone,
+        signInAsGuest,
         signOut,
         getToken,
       }}

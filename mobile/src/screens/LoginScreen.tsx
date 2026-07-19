@@ -22,7 +22,7 @@ import { colors, fonts } from '../theme'
 type Step = 'choose' | 'phone' | 'code'
 
 export default function LoginScreen() {
-  const { signInWithGoogle, signInWithPhone, signingIn } = useAuth()
+  const { signInWithGoogle, signInWithPhone, signInAsGuest, signingIn } = useAuth()
   const { t } = useI18n()
   const [step, setStep] = useState<Step>('choose')
   const [countryIso, setCountryIso] = useState('US')
@@ -49,6 +49,19 @@ export default function LoginScreen() {
     } catch {
       setError(t('errGoogle'))
     } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onGuest() {
+    if (loading) return
+    setBusy(true)
+    setError(null)
+    try {
+      await signInAsGuest()
+      // onAuthStateChanged drops us into the app as a guest.
+    } catch {
+      setError(t('errGoogle'))
       setBusy(false)
     }
   }
@@ -141,6 +154,17 @@ export default function LoginScreen() {
               }}
               disabled={loading}
             />
+
+            <View style={styles.guestBlock}>
+              <Pressable
+                onPress={onGuest}
+                disabled={loading}
+                style={({ pressed }) => [styles.guestBtn, pressed && styles.pressed]}
+              >
+                <Text style={styles.guestBtnText}>{t('guestTry')}</Text>
+              </Pressable>
+              <Text style={styles.guestSub}>{t('guestTrySub')}</Text>
+            </View>
           </View>
         )}
 
@@ -310,6 +334,22 @@ const styles = StyleSheet.create({
   },
   googleText: { fontFamily: fonts.sansSemibold, color: colors.stone700, fontSize: 16 },
   pressed: { opacity: 0.9 },
+  guestBlock: { alignItems: 'center', gap: 6, marginTop: 4 },
+  guestBtn: { paddingVertical: 6, paddingHorizontal: 8 },
+  guestBtnText: {
+    fontFamily: fonts.sansSemibold,
+    color: colors.stone700,
+    fontSize: 15,
+    textDecorationLine: 'underline',
+    textAlign: 'center',
+  },
+  guestSub: {
+    fontFamily: fonts.sans,
+    color: colors.stone400,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+  },
   input: {
     backgroundColor: 'rgba(255,255,255,0.7)',
     borderRadius: 16,

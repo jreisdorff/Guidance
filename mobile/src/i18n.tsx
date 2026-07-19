@@ -68,6 +68,16 @@ const dict: Record<Lang, Dict> = {
       'What do you wish you could believe about yourself?',
     ],
 
+    // Guest trial (ask a few questions before signing in)
+    signIn: 'Sign in',
+    guestTry: 'Ask 3 questions first — no account needed',
+    guestTrySub: 'Try Guidance free. You can ask 3 questions before signing in.',
+    guestBanner: 'Guest · {n} of 3 free questions left',
+    guestBannerLast: 'Guest · 1 free question left, then sign in',
+    guestLimitTitle: 'You’ve used your 3 free questions',
+    guestLimitMsg: 'Sign in or create a free account to keep asking — it only takes a moment.',
+    guestSignIn: 'Sign in to continue',
+
     // Result
     sayAnother: 'Say it another way',
     startFresh: 'Start fresh',
@@ -175,6 +185,16 @@ const dict: Record<Lang, Dict> = {
       '¿Qué te dice la voz crítica?',
       '¿Qué te gustaría poder creer sobre ti mismo?',
     ],
+
+    // Guest trial (ask a few questions before signing in)
+    signIn: 'Iniciar sesión',
+    guestTry: 'Haz 3 preguntas primero — sin cuenta',
+    guestTrySub: 'Prueba Guidance gratis. Puedes hacer 3 preguntas antes de iniciar sesión.',
+    guestBanner: 'Invitado · te quedan {n} de 3 preguntas gratis',
+    guestBannerLast: 'Invitado · queda 1 pregunta gratis, luego inicia sesión',
+    guestLimitTitle: 'Ya usaste tus 3 preguntas gratis',
+    guestLimitMsg: 'Inicia sesión o crea una cuenta gratis para seguir preguntando — solo toma un momento.',
+    guestSignIn: 'Inicia sesión para continuar',
 
     // Result
     sayAnother: 'Dilo de otra manera',

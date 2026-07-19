@@ -50,6 +50,25 @@ const dict = {
     guestLimitMsg: 'Sign in or create a free account to keep asking — it only takes a moment.',
     guestSignIn: 'Sign in to continue',
 
+    // Landing page
+    logIn: 'Log in',
+    landingEyebrow: 'A quiet daily practice',
+    landingTitle: 'Set down what you’re carrying.',
+    landingSubtitle:
+      'Guidance is a private space to write what you’re feeling. It reads for the feeling underneath your words and offers back an affirmation made just for you.',
+    landingCta: 'Try it free',
+    landingCtaNote: 'Ask 3 questions before signing in — no account needed.',
+    landingHow: 'How it works',
+    landingStep1Title: 'Write honestly',
+    landingStep1Body: 'Type whatever is on your mind — no filters, no performance.',
+    landingStep2Title: 'We hear the feeling underneath',
+    landingStep2Body:
+      'Comparison, self-doubt, fear, exhaustion — Guidance listens for what’s really there.',
+    landingStep3Title: 'Receive an affirmation',
+    landingStep3Body:
+      'A fresh, personal affirmation written back to you, and saved to your private journal.',
+    landingPrivacyNote: 'Private by design. Your journal is yours alone.',
+
     // Mode toggle
     modeCustom: '✨ Custom affirmations',
     modeOffline: '🌿 Offline',
@@ -166,6 +185,25 @@ const dict = {
     guestLimitTitle: 'Ya usaste tus 3 preguntas gratis',
     guestLimitMsg: 'Inicia sesión o crea una cuenta gratis para seguir preguntando — solo toma un momento.',
     guestSignIn: 'Inicia sesión para continuar',
+
+    // Landing page
+    logIn: 'Iniciar sesión',
+    landingEyebrow: 'Una práctica diaria y tranquila',
+    landingTitle: 'Deja lo que estás cargando.',
+    landingSubtitle:
+      'Guidance es un espacio privado para escribir lo que sientes. Lee el sentimiento detrás de tus palabras y te devuelve una afirmación hecha solo para ti.',
+    landingCta: 'Pruébalo gratis',
+    landingCtaNote: 'Haz 3 preguntas antes de iniciar sesión — sin cuenta.',
+    landingHow: 'Cómo funciona',
+    landingStep1Title: 'Escribe con sinceridad',
+    landingStep1Body: 'Escribe lo que tengas en mente — sin filtros, sin actuar.',
+    landingStep2Title: 'Escuchamos el sentimiento de fondo',
+    landingStep2Body:
+      'Comparación, dudas, miedo, agotamiento — Guidance escucha lo que de verdad hay ahí.',
+    landingStep3Title: 'Recibe una afirmación',
+    landingStep3Body:
+      'Una afirmación fresca y personal escrita para ti, y guardada en tu diario privado.',
+    landingPrivacyNote: 'Privado por diseño. Tu diario es solo tuyo.',
 
     // Mode toggle
     modeCustom: '✨ Afirmaciones personalizadas',

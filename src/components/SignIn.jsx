@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   GoogleAuthProvider,
   RecaptchaVerifier,
+  signInAnonymously,
   signInWithPhoneNumber,
   signInWithPopup,
 } from 'firebase/auth'
@@ -37,6 +38,20 @@ export function SignIn() {
     setError('')
     try {
       await signInWithPopup(auth, new GoogleAuthProvider())
+    } catch {
+      setError(t('errGoogle'))
+      setBusy(false)
+    }
+  }
+
+  // Guest mode: an anonymous Firebase user, so the backend still gets a valid
+  // token. Lets people try a few questions before signing in for real.
+  async function withGuest() {
+    setBusy(true)
+    setError('')
+    try {
+      await signInAnonymously(auth)
+      // onAuthStateChanged drops us into the app as a guest.
     } catch {
       setError(t('errGoogle'))
       setBusy(false)
@@ -161,6 +176,17 @@ export function SignIn() {
               >
                 {t('continuePhone')}
               </button>
+
+              <div className="mt-1 flex flex-col items-center gap-1">
+                <button
+                  onClick={withGuest}
+                  disabled={busy}
+                  className="font-600 text-stone-700 underline underline-offset-2 transition hover:text-stone-900 disabled:opacity-50"
+                >
+                  {t('guestTry')}
+                </button>
+                <p className="text-xs leading-relaxed text-stone-400">{t('guestTrySub')}</p>
+              </div>
             </div>
           )}
 

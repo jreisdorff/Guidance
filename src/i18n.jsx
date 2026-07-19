@@ -40,6 +40,16 @@ const dict = {
     privacyShort: 'Privacy',
     privacyPolicy: 'Privacy Policy',
 
+    // Guest trial (ask a few questions before signing in)
+    signIn: 'Sign in',
+    guestTry: 'Ask 3 questions first — no account needed',
+    guestTrySub: 'Try Guidance free. You can ask 3 questions before signing in.',
+    guestBanner: 'Guest · {n} of 3 free questions left',
+    guestBannerLast: 'Guest · 1 free question left, then sign in',
+    guestLimitTitle: 'You’ve used your 3 free questions',
+    guestLimitMsg: 'Sign in or create a free account to keep asking — it only takes a moment.',
+    guestSignIn: 'Sign in to continue',
+
     // Mode toggle
     modeCustom: '✨ Custom affirmations',
     modeOffline: '🌿 Offline',
@@ -146,6 +156,16 @@ const dict = {
     terms: 'Términos',
     privacyShort: 'Privacidad',
     privacyPolicy: 'Política de Privacidad',
+
+    // Guest trial (ask a few questions before signing in)
+    signIn: 'Iniciar sesión',
+    guestTry: 'Haz 3 preguntas primero — sin cuenta',
+    guestTrySub: 'Prueba Guidance gratis. Puedes hacer 3 preguntas antes de iniciar sesión.',
+    guestBanner: 'Invitado · te quedan {n} de 3 preguntas gratis',
+    guestBannerLast: 'Invitado · queda 1 pregunta gratis, luego inicia sesión',
+    guestLimitTitle: 'Ya usaste tus 3 preguntas gratis',
+    guestLimitMsg: 'Inicia sesión o crea una cuenta gratis para seguir preguntando — solo toma un momento.',
+    guestSignIn: 'Inicia sesión para continuar',
 
     // Mode toggle
     modeCustom: '✨ Afirmaciones personalizadas',

@@ -27,13 +27,15 @@ export function AffirmationResult({ result, loading, onAnother, onReset, section
         </blockquote>
 
         <div className="relative mt-8 flex flex-wrap items-center gap-3">
-          <button
-            onClick={onAnother}
-            disabled={loading}
-            className="rounded-full bg-stone-800/90 px-5 py-2 text-sm font-600 text-amber-50 transition hover:bg-stone-800 active:scale-[0.98] disabled:opacity-50"
-          >
-            {t('sayAnother')}
-          </button>
+          {onAnother && (
+            <button
+              onClick={onAnother}
+              disabled={loading}
+              className="rounded-full bg-stone-800/90 px-5 py-2 text-sm font-600 text-amber-50 transition hover:bg-stone-800 active:scale-[0.98] disabled:opacity-50"
+            >
+              {t('sayAnother')}
+            </button>
+          )}
           <button
             onClick={onReset}
             className="rounded-full px-5 py-2 text-sm font-600 text-stone-500 transition hover:bg-white/60 hover:text-stone-700"

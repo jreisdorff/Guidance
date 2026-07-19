@@ -34,6 +34,14 @@ export function Home({ user }) {
   const [deleting, setDeleting] = useState(false)
   const resultRef = useRef(null)
 
+  // Guest trial: anonymous users may ask a fixed number of questions before
+  // signing in. A "question" is one moment (groupId); re-phrasings reuse it.
+  const GUEST_LIMIT = 3
+  const isGuest = user?.isAnonymous ?? false
+  const questionsAsked = new Set(journal.map((r) => r.groupId ?? r.id)).size
+  const guestRemaining = Math.max(0, GUEST_LIMIT - questionsAsked)
+  const guestLocked = isGuest && guestRemaining <= 0
+
   useEffect(() => {
     checkAiAvailable().then(setAiAvailable)
   }, [])
@@ -54,7 +62,8 @@ export function Home({ user }) {
   // Produces an affirmation, trying Claude first (when in AI mode) and quietly
   // falling back to the offline local engine on any failure.
   async function produce(text, avoid) {
-    if (mode === 'ai') {
+    // Guests always use the AI path (the mode toggle is hidden for them).
+    if (isGuest || mode === 'ai') {
       try {
         const ai = await generateAffirmationAI(text, avoid, lang)
         setAiAvailable(true)
@@ -81,7 +90,7 @@ export function Home({ user }) {
   async function handleSubmit(e) {
     e?.preventDefault()
     const text = entry.trim()
-    if (!text || loading) return
+    if (!text || loading || guestLocked) return
 
     setLoading(true)
     setNotice(null)
@@ -246,7 +255,7 @@ export function Home({ user }) {
           onClick={handleSignOut}
           className="absolute right-6 top-6 z-10 text-sm font-600 text-stone-400 underline-offset-2 transition hover:text-stone-600 hover:underline sm:top-8"
         >
-          {t('signOut')}
+          {isGuest ? t('signIn') : t('signOut')}
         </button>
 
         {/* Header */}
@@ -258,17 +267,52 @@ export function Home({ user }) {
             Guidance
           </h1>
 
-          <ModeToggle mode={mode} setMode={setMode} aiAvailable={aiAvailable} />
+          {!isGuest && (
+            <ModeToggle mode={mode} setMode={setMode} aiAvailable={aiAvailable} />
+          )}
         </header>
 
-        <Composer
-          prompt={t('prompts')[promptIndex]}
-          entry={entry}
-          setEntry={setEntry}
-          onSubmit={handleSubmit}
-          loading={loading}
-          notice={notice}
-        />
+        {/* Guest trial banner — kept visible so the 3-question limit is clear */}
+        {isGuest && !guestLocked && (
+          <div className="mt-6 flex items-center justify-center gap-2 text-center">
+            <span className="rounded-full bg-white/60 px-4 py-1.5 text-sm font-600 text-amber-700 ring-1 ring-white/60">
+              {guestRemaining === 1
+                ? t('guestBannerLast')
+                : t('guestBanner', { n: guestRemaining })}
+            </span>
+            <button
+              onClick={handleSignOut}
+              className="text-sm font-700 text-stone-700 underline underline-offset-2 transition hover:text-stone-900"
+            >
+              {t('signIn')}
+            </button>
+          </div>
+        )}
+
+        {guestLocked ? (
+          /* Trial used up — must sign in to keep asking */
+          <div className="animate-rise mt-8 rounded-3xl bg-white/80 p-8 text-center shadow-xl shadow-orange-900/5 ring-1 ring-white/60 backdrop-blur">
+            <h2 className="font-serif text-2xl text-stone-800">{t('guestLimitTitle')}</h2>
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-stone-500">
+              {t('guestLimitMsg')}
+            </p>
+            <button
+              onClick={handleSignOut}
+              className="mt-6 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 px-6 py-3 font-600 text-white shadow-lg shadow-rose-500/20 transition hover:brightness-105 active:scale-[0.98]"
+            >
+              {t('guestSignIn')}
+            </button>
+          </div>
+        ) : (
+          <Composer
+            prompt={t('prompts')[promptIndex]}
+            entry={entry}
+            setEntry={setEntry}
+            onSubmit={handleSubmit}
+            loading={loading}
+            notice={notice}
+          />
+        )}
 
         {/* Loading placeholder */}
         {loading && !result && (
@@ -287,7 +331,7 @@ export function Home({ user }) {
             key={result.affirmation}
             result={result}
             loading={loading}
-            onAnother={handleAnother}
+            onAnother={isGuest ? null : handleAnother}
             onReset={reset}
             sectionRef={resultRef}
           />
@@ -301,7 +345,7 @@ export function Home({ user }) {
         />
 
         <footer className="mt-auto pt-16 text-center text-xs text-stone-400">
-          {mode === 'ai' && aiAvailable ? (
+          {(isGuest || mode === 'ai') && aiAvailable ? (
             <p>{t('writtenLive')}</p>
           ) : (
             <p>{t('staysOnDevice')}</p>
@@ -310,20 +354,24 @@ export function Home({ user }) {
             onClick={handleSignOut}
             className="mt-3 text-stone-400 underline-offset-2 transition hover:text-stone-600 hover:underline"
           >
-            {t('signOut')}
+            {isGuest ? t('signIn') : t('signOut')}
           </button>
           <p className="mt-4 text-stone-400">
             <a href="/privacy" className="underline-offset-2 transition hover:text-stone-600 hover:underline">{t('privacyShort')}</a>
             <span className="px-1.5">·</span>
             <a href="/terms" className="underline-offset-2 transition hover:text-stone-600 hover:underline">{t('terms')}</a>
-            <span className="px-1.5">·</span>
-            <button
-              onClick={handleDeleteAccount}
-              disabled={deleting}
-              className="underline-offset-2 transition hover:text-rose-500 hover:underline disabled:opacity-50"
-            >
-              {deleting ? t('deleting') : t('deleteAccount')}
-            </button>
+            {!isGuest && (
+              <>
+                <span className="px-1.5">·</span>
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleting}
+                  className="underline-offset-2 transition hover:text-rose-500 hover:underline disabled:opacity-50"
+                >
+                  {deleting ? t('deleting') : t('deleteAccount')}
+                </button>
+              </>
+            )}
           </p>
         </footer>
       </main>

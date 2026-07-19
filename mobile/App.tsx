@@ -14,6 +14,7 @@ import {
 } from '@expo-google-fonts/nunito-sans'
 import Background from './src/components/Background'
 import { AuthProvider, useAuth } from './src/auth/AuthContext'
+import { I18nProvider } from './src/i18n'
 import LoginScreen from './src/screens/LoginScreen'
 import HomeScreen from './src/screens/HomeScreen'
 import { colors } from './src/theme'
@@ -47,9 +48,11 @@ export default function App() {
     <Background>
       <StatusBar style="dark" />
       {fontsLoaded ? (
-        <AuthProvider>
-          <Root />
-        </AuthProvider>
+        <I18nProvider>
+          <AuthProvider>
+            <Root />
+          </AuthProvider>
+        </I18nProvider>
       ) : (
         <View style={styles.center}>
           <ActivityIndicator color={colors.rose500} size="large" />

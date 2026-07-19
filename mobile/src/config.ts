@@ -16,3 +16,9 @@ export const GOOGLE_WEB_CLIENT_ID =
 // iOS OAuth client ID — required for the iOS build's native sign-in.
 export const GOOGLE_IOS_CLIENT_ID =
   process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? ''
+
+// The public marketing/legal site (the same pages the web app links to). Used
+// for the Privacy and Terms links in the app footer.
+export const SITE_URL = process.env.EXPO_PUBLIC_SITE_URL ?? 'https://guidances.net'
+export const PRIVACY_URL = `${SITE_URL}/privacy`
+export const TERMS_URL = `${SITE_URL}/terms`

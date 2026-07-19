@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -11,60 +13,39 @@ import {
 } from 'react-native'
 import SunMark from '../components/SunMark'
 import GradientButton from '../components/GradientButton'
+import LanguageToggle from '../components/LanguageToggle'
+import Journal from '../components/Journal'
+import ConfirmModal from '../components/ConfirmModal'
 import { useAuth } from '../auth/AuthContext'
 import { getGuidance, type Guidance, ApiError } from '../api/client'
-import { addEntry, subscribeEntries, type JournalItem } from '../journal'
-import { colors, fonts, PROMPTS } from '../theme'
+import { deleteAccount } from '../api/account'
+import { addEntry, removeEntry, subscribeEntries, type JournalItem } from '../journal'
+import { useI18n, translate } from '../i18n'
+import { PRIVACY_URL, TERMS_URL } from '../config'
+import { colors, fonts } from '../theme'
 
-type ResultItem = Guidance & { entry: string; ts: number }
-
-// Just the time within a day's group, e.g. "3:45 PM".
-function formatTime(ts: number) {
-  return new Date(ts).toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-  })
-}
-
-// A friendly header for a day: "Today", "Yesterday", else "Monday, July 13".
-function dateLabel(ts: number) {
-  const startOfDay = (d: Date) =>
-    new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
-  const diffDays = Math.round((startOfDay(new Date()) - startOfDay(new Date(ts))) / 86400000)
-  if (diffDays === 0) return 'Today'
-  if (diffDays === 1) return 'Yesterday'
-  return new Date(ts).toLocaleDateString(undefined, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  })
-}
-
-// Groups entries (already newest-first) into consecutive day buckets.
-function groupByDate(entries: JournalItem[]) {
-  const groups: { label: string; items: JournalItem[] }[] = []
-  for (const e of entries) {
-    const label = dateLabel(e.ts)
-    const last = groups[groups.length - 1]
-    if (last && last.label === label) last.items.push(e)
-    else groups.push({ label, items: [e] })
-  }
-  return groups
-}
+type ResultItem = Guidance & { entry: string; ts: number; groupId: number }
 
 export default function HomeScreen() {
   const { user, getToken, signOut } = useAuth()
+  const { t, lang, list } = useI18n()
   const scrollRef = useRef<ScrollView>(null)
-  const [prompt] = useState(
-    () => PROMPTS[Math.floor((Date.now() / 1000) % PROMPTS.length)],
-  )
+  // Keep an index (not the text) so switching language re-localizes the prompt.
+  const [promptIndex] = useState(() => {
+    const len = list('prompts').length || 1
+    return Math.floor((Date.now() / 1000) % len)
+  })
   const [entry, setEntry] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [result, setResult] = useState<ResultItem | null>(null)
   const [journal, setJournal] = useState<JournalItem[]>([])
-  const [showJournal, setShowJournal] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  const prompts = list('prompts')
+  const prompt = prompts[promptIndex] ?? prompts[0] ?? ''
 
   // Live-subscribe to this user's journal in Firestore.
   useEffect(() => {
@@ -72,27 +53,61 @@ export default function HomeScreen() {
     return subscribeEntries(user.uid, setJournal)
   }, [user])
 
+  // Maps an API failure to a gentle, human notice. 401 (expired session) is
+  // handled by the caller, which signs out; everything else stays soft — we
+  // never surface a raw status or code.
+  function noticeFor(err: unknown): string {
+    if (err instanceof ApiError) {
+      if (err.status === 503) return t('noticeNoKey')
+      if (err.code === 'refusal') return t('noticeRefusal')
+    }
+    return t('noticeUnreachable')
+  }
+
   async function onSubmit() {
     if (!entry.trim() || loading) return
     setLoading(true)
-    setError(null)
+    setNotice(null)
     try {
       const token = await getToken()
-      if (!token) {
-        await signOut()
-        return
-      }
-      const guidance = await getGuidance(token, entry.trim(), result?.affirmation)
-      const record = { ...guidance, entry: entry.trim(), ts: Date.now() }
+      if (!token) return void signOut()
+      const guidance = await getGuidance(token, entry.trim(), result?.affirmation, lang)
+      // groupId anchors this moment; re-phrasings (onAnother) reuse it so the
+      // journal can group them under one card.
+      const ts = Date.now()
+      const record: ResultItem = { ...guidance, entry: entry.trim(), ts, groupId: ts }
       setResult(record)
       // Persist to Firestore; the subscription refreshes the journal list.
       if (user) addEntry(user.uid, record).catch(() => {})
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        await signOut()
-        return
+      if (err instanceof ApiError && err.status === 401) return void signOut()
+      setNotice(noticeFor(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Regenerate a fresh affirmation for the same entry, phrased differently.
+  // Each re-phrasing is logged as its own entry but shares the moment's groupId.
+  async function onAnother() {
+    if (!result || loading) return
+    setLoading(true)
+    setNotice(null)
+    try {
+      const token = await getToken()
+      if (!token) return void signOut()
+      const guidance = await getGuidance(token, result.entry, result.affirmation, lang)
+      const record: ResultItem = {
+        ...guidance,
+        entry: result.entry,
+        ts: Date.now(),
+        groupId: result.groupId,
       }
-      setError('Could not reach Guidance right now. Please try again.')
+      setResult(record)
+      if (user) addEntry(user.uid, record).catch(() => {})
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) return void signOut()
+      setNotice(noticeFor(err))
     } finally {
       setLoading(false)
     }
@@ -110,36 +125,102 @@ export default function HomeScreen() {
     }
   }
 
-  // Regenerate a fresh affirmation for the same entry, phrased differently.
-  async function onAnother() {
-    if (!result || loading) return
-    setLoading(true)
-    setError(null)
-    try {
-      const token = await getToken()
-      if (!token) {
-        await signOut()
-        return
-      }
-      const guidance = await getGuidance(token, result.entry, result.affirmation)
-      setResult((prev) => (prev ? { ...prev, ...guidance } : prev))
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        await signOut()
-        return
-      }
-      setError('Could not reach Guidance right now. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   // Clear the input and current response, and scroll back to the top.
   function onReset() {
     setEntry('')
     setResult(null)
-    setError(null)
+    setNotice(null)
     scrollRef.current?.scrollTo({ y: 0, animated: true })
+  }
+
+  function deleteEntry(id: string) {
+    if (user) removeEntry(user.uid, id).catch(() => {})
+  }
+
+  function clearJournal() {
+    if (!user) return
+    journal.forEach((r) => removeEntry(user.uid, r.id).catch(() => {}))
+  }
+
+  // Share the signed-in user's full journal, as a human-readable .txt body or a
+  // machine-readable JSON string, through the native share sheet. The data is
+  // already on the device — nothing is sent anywhere the user doesn't choose.
+  async function exportJournal(format: 'txt' | 'json') {
+    if (!user || !journal.length) return
+    const tt = (key: string, vars?: Record<string, unknown>) => translate(lang, key, vars)
+
+    let contents: string
+    if (format === 'txt') {
+      const lines = [
+        tt('exportTitle'),
+        tt('exportExported', { date: new Date().toLocaleString(lang) }),
+        journal.length === 1
+          ? tt('exportEntry', { n: journal.length })
+          : tt('exportEntries', { n: journal.length }),
+      ]
+      journal.forEach((r) => {
+        lines.push(
+          '',
+          '─'.repeat(32),
+          new Date(r.ts).toLocaleString(lang) + (r.themeLabel ? ` · ${r.themeLabel}` : ''),
+          '',
+          tt('exportYouWrote'),
+          `  ${r.entry}`,
+        )
+        if (r.reflect) lines.push('', tt('exportReflection'), `  ${r.reflect}`)
+        lines.push('', tt('exportAffirmation'), `  ${r.affirmation}`)
+      })
+      contents = lines.join('\n') + '\n'
+    } else {
+      contents = JSON.stringify(
+        {
+          app: 'Guidance',
+          exportedAt: new Date().toISOString(),
+          account: {
+            uid: user.uid,
+            email: user.email ?? null,
+            name: user.displayName ?? null,
+            phone: user.phoneNumber ?? null,
+          },
+          entryCount: journal.length,
+          entries: journal.map((r) => ({
+            id: r.id,
+            date: new Date(r.ts).toISOString(),
+            ts: r.ts,
+            theme: r.themeLabel ?? null,
+            entry: r.entry,
+            reflection: r.reflect ?? null,
+            affirmation: r.affirmation,
+            source: r.source ?? null,
+          })),
+        },
+        null,
+        2,
+      )
+    }
+
+    try {
+      await Share.share({ title: tt('exportTitle'), message: contents })
+    } catch {
+      // user dismissed the share sheet, or sharing is unavailable
+    }
+  }
+
+  // Permanently delete the account and every journal entry, via the backend.
+  async function handleDeleteAccount() {
+    if (deleting) return
+    setConfirmDelete(false)
+    setDeleting(true)
+    setNotice(null)
+    try {
+      const token = await getToken()
+      if (!token) return void signOut()
+      await deleteAccount(token)
+      await signOut()
+    } catch {
+      setNotice(t('noticeDeleteFailed'))
+      setDeleting(false)
+    }
   }
 
   return (
@@ -153,9 +234,11 @@ export default function HomeScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
+        {/* Language — top left */}
+        <LanguageToggle style={styles.langTop} />
         {/* Sign out — top right */}
         <Pressable style={styles.signOutTop} onPress={signOut} hitSlop={8}>
-          <Text style={styles.signOut}>Sign out</Text>
+          <Text style={styles.signOut}>{t('signOut')}</Text>
         </Pressable>
 
         {/* Header */}
@@ -169,7 +252,7 @@ export default function HomeScreen() {
         <View style={styles.inputCard}>
           <TextInput
             style={styles.input}
-            placeholder="Type honestly…"
+            placeholder={t('entryPlaceholder')}
             placeholderTextColor={colors.stone400}
             multiline
             value={entry}
@@ -178,7 +261,7 @@ export default function HomeScreen() {
           />
           <View style={styles.inputActions}>
             <GradientButton
-              label="Receive an affirmation"
+              label={t('receiveBtn')}
               onPress={onSubmit}
               disabled={!entry.trim()}
               loading={loading}
@@ -186,15 +269,13 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {error && <Text style={styles.error}>{error}</Text>}
+        {notice && <Text style={styles.notice}>{notice}</Text>}
 
         {/* Loading placeholder */}
         {loading && !result && (
           <View style={styles.loadingCard}>
             <SunMark size={40} />
-            <Text style={styles.loadingText}>
-              Composing something just for you…
-            </Text>
+            <Text style={styles.loadingText}>{t('composingForYou')}</Text>
           </View>
         )}
 
@@ -203,9 +284,7 @@ export default function HomeScreen() {
           <View>
             <View style={styles.resultCard}>
               <Pressable style={styles.copyBtn} onPress={onCopy} hitSlop={8}>
-                <Text style={styles.copyBtnText}>
-                  {copied ? 'Copied' : 'Copy'}
-                </Text>
+                <Text style={styles.copyBtnText}>{copied ? t('copied') : t('copy')}</Text>
               </Pressable>
               <Text style={styles.theme}>{result.themeLabel}</Text>
               <Text style={styles.reflect}>{result.reflect}</Text>
@@ -217,73 +296,61 @@ export default function HomeScreen() {
                   onPress={onAnother}
                   disabled={loading}
                 >
-                  <Text style={styles.anotherBtnText}>Say it another way</Text>
+                  <Text style={styles.anotherBtnText}>{t('sayAnother')}</Text>
                 </Pressable>
                 <Pressable
                   style={({ pressed }) => [styles.freshBtn, pressed && styles.pressed]}
                   onPress={onReset}
                 >
-                  <Text style={styles.freshBtnText}>Start fresh</Text>
+                  <Text style={styles.freshBtnText}>{t('startFresh')}</Text>
                 </Pressable>
               </View>
             </View>
-            <Text style={styles.breathe}>
-              Read it slowly. Take one full breath before you move on.
-            </Text>
+            <Text style={styles.breathe}>{t('breathe')}</Text>
           </View>
         )}
 
         {/* Journal */}
-        <View style={styles.journalSection}>
-          <Pressable
-            style={styles.journalToggle}
-            onPress={() => setShowJournal((s) => !s)}
-            hitSlop={8}
-          >
-            <Text style={styles.caret}>{showJournal ? '⌄' : '›'}</Text>
-            <Text style={styles.journalToggleText}>Your journal</Text>
-            {journal.length > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{journal.length}</Text>
-              </View>
-            )}
-          </Pressable>
-
-          {showJournal && (
-            <View style={styles.journalList}>
-              {journal.length === 0 ? (
-                <View style={styles.emptyCard}>
-                  <Text style={styles.emptyText}>
-                    Nothing here yet. What you share will be saved to your
-                    account, for you to return to.
-                  </Text>
-                </View>
-              ) : (
-                groupByDate(journal).map((group) => (
-                  <View key={group.label} style={styles.journalGroup}>
-                    <Text style={styles.journalDate}>{group.label}</Text>
-                    {group.items.map((r) => (
-                      <View key={r.id} style={styles.journalCard}>
-                        <Text style={styles.journalTime}>{formatTime(r.ts)}</Text>
-                        <Text style={styles.journalEntry}>“{r.entry}”</Text>
-                        <Text style={styles.journalAffirmation}>{r.affirmation}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ))
-              )}
-            </View>
-          )}
-        </View>
+        <Journal
+          journal={journal}
+          onDelete={deleteEntry}
+          onClear={clearJournal}
+          onExport={exportJournal}
+        />
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Written for you 🌅</Text>
+          <Text style={styles.footerText}>{t('writtenLive')}</Text>
           <Pressable onPress={signOut} hitSlop={8}>
-            <Text style={styles.signOut}>Sign out</Text>
+            <Text style={styles.signOut}>{t('signOut')}</Text>
           </Pressable>
+          <View style={styles.footerLinks}>
+            <Pressable onPress={() => Linking.openURL(PRIVACY_URL)} hitSlop={8}>
+              <Text style={styles.footerLink}>{t('privacyShort')}</Text>
+            </Pressable>
+            <Text style={styles.footerDot}>·</Text>
+            <Pressable onPress={() => Linking.openURL(TERMS_URL)} hitSlop={8}>
+              <Text style={styles.footerLink}>{t('terms')}</Text>
+            </Pressable>
+            <Text style={styles.footerDot}>·</Text>
+            <Pressable onPress={() => setConfirmDelete(true)} disabled={deleting} hitSlop={8}>
+              <Text style={[styles.footerLink, styles.deleteLink]}>
+                {deleting ? t('deleting') : t('deleteAccount')}
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
+
+      <ConfirmModal
+        open={confirmDelete}
+        title={t('deleteAccountTitle')}
+        message={t('deleteAccountMsg')}
+        confirmLabel={t('deleteAccount')}
+        cancelLabel={t('cancel')}
+        onConfirm={handleDeleteAccount}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </KeyboardAvoidingView>
   )
 }
@@ -303,12 +370,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { paddingHorizontal: 24, paddingTop: 72, paddingBottom: 48, gap: 20 },
 
-  signOutTop: {
-    position: 'absolute',
-    top: 64,
-    right: 24,
-    zIndex: 10,
-  },
+  langTop: { position: 'absolute', top: 64, left: 24, zIndex: 10 },
+  signOutTop: { position: 'absolute', top: 64, right: 24, zIndex: 10 },
 
   header: { alignItems: 'center', gap: 12 },
   title: {
@@ -339,7 +402,13 @@ const styles = StyleSheet.create({
   },
   inputActions: { alignItems: 'flex-end', paddingHorizontal: 6, paddingBottom: 4 },
 
-  error: { fontFamily: fonts.sans, color: colors.rose500, fontSize: 15, textAlign: 'center' },
+  notice: {
+    fontFamily: fonts.sans,
+    color: colors.amber700,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
 
   loadingCard: {
     ...cardBase,
@@ -413,69 +482,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
 
-  journalSection: { marginTop: 12 },
-  journalToggle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  caret: { fontFamily: fonts.sansBold, color: colors.stone500, fontSize: 18 },
-  journalToggleText: { fontFamily: fonts.sansSemibold, color: colors.stone500, fontSize: 15 },
-  badge: {
-    backgroundColor: colors.card,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 1,
-  },
-  badgeText: { fontFamily: fonts.sans, color: colors.stone400, fontSize: 12 },
-
-  journalList: { marginTop: 14, gap: 20 },
-  journalGroup: { gap: 12 },
-  journalDate: {
-    fontFamily: fonts.sansSemibold,
-    color: colors.stone400,
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-    paddingHorizontal: 2,
-  },
-  emptyCard: {
-    backgroundColor: colors.cardSoft,
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-  },
-  emptyText: {
-    fontFamily: fonts.sans,
-    color: colors.stone400,
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 21,
-  },
-  journalCard: {
-    backgroundColor: colors.cardSoft,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.ring,
-    padding: 18,
-  },
-  journalTime: {
-    fontFamily: fonts.sans,
-    color: colors.stone400,
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  journalEntry: {
-    fontFamily: fonts.serifItalic,
-    color: colors.stone500,
-    fontSize: 14,
-    marginTop: 8,
-  },
-  journalAffirmation: {
-    fontFamily: fonts.serif,
-    color: colors.stone700,
-    fontSize: 17,
-    lineHeight: 26,
-    marginTop: 10,
-  },
-
   footer: { marginTop: 24, alignItems: 'center', gap: 10 },
   footerText: { fontFamily: fonts.sans, color: colors.stone400, fontSize: 13 },
   signOut: {
@@ -484,4 +490,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textDecorationLine: 'underline',
   },
+  footerLinks: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  footerLink: {
+    fontFamily: fonts.sans,
+    color: colors.stone400,
+    fontSize: 13,
+    textDecorationLine: 'underline',
+  },
+  deleteLink: {},
+  footerDot: { fontFamily: fonts.sans, color: colors.stone300, fontSize: 13 },
 })

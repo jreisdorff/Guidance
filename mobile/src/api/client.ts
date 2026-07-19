@@ -39,7 +39,13 @@ async function post<T>(path: string, body: unknown, token?: string): Promise<T> 
   return res.json() as Promise<T>
 }
 
-// Asks the backend for a piece of guidance for `entry`.
-export function getGuidance(token: string, entry: string, lastAffirmation?: string) {
-  return post<Guidance>('/api/affirm', { entry, lastAffirmation }, token)
+// Asks the backend for a piece of guidance for `entry`, in the given language
+// ('en' | 'es'). Claude is natively multilingual; `lang` is just a directive.
+export function getGuidance(
+  token: string,
+  entry: string,
+  lastAffirmation?: string,
+  lang?: string,
+) {
+  return post<Guidance>('/api/affirm', { entry, lastAffirmation, lang }, token)
 }

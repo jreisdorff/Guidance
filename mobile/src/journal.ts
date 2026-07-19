@@ -13,7 +13,14 @@ import {
 } from '@react-native-firebase/firestore'
 import type { Guidance } from './api/client'
 
-export type JournalItem = Guidance & { id: string; entry: string; ts: number }
+// `groupId` anchors a moment: re-phrasings of the same entry share it, so the
+// journal can collapse them into one card (mirrors the web app).
+export type JournalItem = Guidance & {
+  id: string
+  entry: string
+  ts: number
+  groupId?: number
+}
 
 const db = getFirestore(getApp())
 
@@ -23,7 +30,7 @@ function entriesCol(uid: string) {
 
 export function addEntry(
   uid: string,
-  record: { entry: string; ts: number } & Guidance,
+  record: { entry: string; ts: number; groupId?: number } & Guidance,
 ) {
   return addDoc(entriesCol(uid), record)
 }

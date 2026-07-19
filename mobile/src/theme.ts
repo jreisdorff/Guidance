@@ -39,10 +39,4 @@ export const fonts = {
   sansBold: 'NunitoSans_700Bold',
 }
 
-export const PROMPTS = [
-  'What is weighing on you right now?',
-  'What are you feeling about yourself today?',
-  'What thought has been circling in your mind?',
-  'What is the critical voice saying to you?',
-  'What do you wish you could believe about yourself?',
-]
+// Prompts now live in the i18n dictionary (src/i18n.tsx) so they localize.

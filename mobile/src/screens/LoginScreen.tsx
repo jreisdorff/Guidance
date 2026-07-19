@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -11,14 +12,18 @@ import Svg, { Path } from 'react-native-svg'
 import SunMark from '../components/SunMark'
 import GradientButton from '../components/GradientButton'
 import CountryPicker from '../components/CountryPicker'
+import LanguageToggle from '../components/LanguageToggle'
 import { COUNTRIES, formatPhone } from '../countries'
 import { useAuth, type Confirmation } from '../auth/AuthContext'
+import { useI18n } from '../i18n'
+import { PRIVACY_URL, TERMS_URL } from '../config'
 import { colors, fonts } from '../theme'
 
 type Step = 'choose' | 'phone' | 'code'
 
 export default function LoginScreen() {
   const { signInWithGoogle, signInWithPhone, signingIn } = useAuth()
+  const { t } = useI18n()
   const [step, setStep] = useState<Step>('choose')
   const [countryIso, setCountryIso] = useState('US')
   const [phoneDigits, setPhoneDigits] = useState('')
@@ -42,7 +47,7 @@ export default function LoginScreen() {
     try {
       await signInWithGoogle()
     } catch {
-      setError('Could not sign in with Google. Please try again.')
+      setError(t('errGoogle'))
     } finally {
       setBusy(false)
     }
@@ -60,7 +65,7 @@ export default function LoginScreen() {
       setCode('')
       setCooldown(30)
     } catch {
-      setError('Could not send a code. Please check the number and try again.')
+      setError(t('errSendCode'))
     } finally {
       setBusy(false)
     }
@@ -90,7 +95,7 @@ export default function LoginScreen() {
       await confirmation.confirm(code.trim())
       // onAuthStateChanged takes over from here.
     } catch {
-      setError('That code isn’t right. Try again.')
+      setError(t('errCode'))
       setBusy(false)
     }
   }
@@ -107,12 +112,12 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
+      <LanguageToggle style={styles.langTop} />
+
       <View style={styles.hero}>
         <SunMark size={56} />
         <Text style={styles.title}>Guidance</Text>
-        <Text style={styles.subtitle}>
-          A quiet space to set down what you're feeling. Sign in to come in.
-        </Text>
+        <Text style={styles.subtitle}>{t('signInSubtitle')}</Text>
       </View>
 
       <View style={styles.card}>
@@ -125,11 +130,11 @@ export default function LoginScreen() {
               disabled={loading}
             >
               <GoogleG />
-              <Text style={styles.googleText}>Continue with Google</Text>
+              <Text style={styles.googleText}>{t('continueGoogle')}</Text>
             </Pressable>
             */}
             <GradientButton
-              label="Continue with phone"
+              label={t('continuePhone')}
               onPress={() => {
                 setStep('phone')
                 setError(null)
@@ -156,7 +161,7 @@ export default function LoginScreen() {
                 onChangeText={(t) =>
                   setPhoneDigits(t.replace(/\D/g, '').slice(0, country.max))
                 }
-                placeholder={country.dial === '1' ? '(555) 000-0000' : 'Phone number'}
+                placeholder={country.dial === '1' ? '(555) 000-0000' : t('phonePlaceholder')}
                 placeholderTextColor={colors.stone400}
                 keyboardType="phone-pad"
                 autoFocus
@@ -164,13 +169,13 @@ export default function LoginScreen() {
               />
             </View>
             <GradientButton
-              label="Send code"
+              label={t('sendCode')}
               onPress={onSendCode}
               disabled={!phoneDigits}
               loading={loading}
             />
             <Pressable onPress={() => setStep('choose')} hitSlop={8}>
-              <Text style={styles.link}>Back</Text>
+              <Text style={styles.link}>{t('back')}</Text>
             </Pressable>
           </View>
         )}
@@ -178,8 +183,9 @@ export default function LoginScreen() {
         {step === 'code' && (
           <View style={styles.stack}>
             <Text style={styles.hint}>
-              Enter the code we texted to +{country.dial}{' '}
-              {formatPhone(phoneDigits, country.dial)}.
+              {t('codeSentTo', {
+                number: `+${country.dial} ${formatPhone(phoneDigits, country.dial)}`,
+              })}
             </Text>
             <TextInput
               style={[styles.input, styles.codeInput]}
@@ -195,18 +201,18 @@ export default function LoginScreen() {
               editable={!loading}
             />
             <GradientButton
-              label="Verify"
+              label={t('verify')}
               onPress={onConfirm}
               disabled={!code.trim()}
               loading={loading}
             />
             <View style={styles.codeActions}>
               <Pressable onPress={changeNumber} hitSlop={8} disabled={loading}>
-                <Text style={styles.link}>Change number</Text>
+                <Text style={styles.link}>{t('changeNumber')}</Text>
               </Pressable>
               <Pressable onPress={onResend} hitSlop={8} disabled={cooldown > 0 || loading}>
                 <Text style={[styles.link, (cooldown > 0 || loading) && styles.linkDisabled]}>
-                  {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
+                  {cooldown > 0 ? t('resendIn', { n: cooldown }) : t('resendCode')}
                 </Text>
               </Pressable>
             </View>
@@ -218,6 +224,21 @@ export default function LoginScreen() {
       {loading && step === 'choose' && (
         <ActivityIndicator color={colors.rose500} style={styles.spinner} />
       )}
+
+      <View style={styles.legal}>
+        <Text style={styles.crisis}>{t('crisisNote')}</Text>
+        <Text style={styles.agree}>
+          {t('agreeBefore')}
+          <Text style={styles.legalLink} onPress={() => Linking.openURL(TERMS_URL)}>
+            {t('terms')}
+          </Text>
+          {t('agreeAnd')}
+          <Text style={styles.legalLink} onPress={() => Linking.openURL(PRIVACY_URL)}>
+            {t('privacyPolicy')}
+          </Text>
+          .
+        </Text>
+      </View>
     </View>
   )
 }
@@ -252,6 +273,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 40,
   },
+  langTop: { position: 'absolute', top: 64, right: 24, zIndex: 10 },
   hero: { alignItems: 'center', gap: 14 },
   title: {
     fontFamily: fonts.serif,
@@ -319,4 +341,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   spinner: { marginTop: -20 },
+  legal: { gap: 12, alignItems: 'center', paddingHorizontal: 8 },
+  crisis: {
+    fontFamily: fonts.sans,
+    color: colors.stone400,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  agree: {
+    fontFamily: fonts.sans,
+    color: colors.stone400,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  legalLink: { color: colors.stone500, textDecorationLine: 'underline' },
 })

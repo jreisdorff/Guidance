@@ -1,7 +1,7 @@
 # Guidance (mobile)
 
 The **Guidance** mobile app — an Expo (React Native) client for the same backend
-that powers the Divinity web app. People sign in with Google and get a piece of
+that powers the Guidance web app. People sign in with Google and get a piece of
 guidance written by Claude for whatever they're feeling.
 
 It shares the backend in this repo (`../server/index.js` locally, `../api/*.js`

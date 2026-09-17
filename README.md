@@ -1,9 +1,9 @@
-# Divinity 🌅
+# Guidance 🌅
 
 A quiet, private space to set down what you're feeling and be reminded of the
-worth that was always yours.
+worth that was always yours. Live at [guidance-amber.vercel.app](https://guidance-amber.vercel.app).
 
-Type honestly about whatever is on your mind. Divinity reads your words for the
+Type honestly about whatever is on your mind. Guidance reads your words for the
 feeling underneath — comparison, self-doubt, fear, feeling stuck, exhaustion,
 setbacks, loneliness, or reaching for something greater — and offers back an
 affirmation matched to it.
